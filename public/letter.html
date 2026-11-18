@@ -55,6 +55,7 @@ textarea::placeholder{color:#ffffff55}
 .privacy{background:#ffffff12;border:1px dashed #ffffff40;border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:13px;line-height:1.6;color:#ffffffdd}
 .privacy summary{cursor:pointer;font-weight:700;color:var(--c1)}
 .privacy ul{margin:8px 0 2px 18px}.privacy b{color:#fff}
+.forget{margin-top:14px;background:transparent;border:1px dashed #ffffff66;color:#ffffffcc;border-radius:10px;padding:9px 12px;font:13px "Noto Sans KR";cursor:pointer;width:100%}
 #tray{max-width:460px;margin:8px auto 0;height:14px;background:linear-gradient(#9c6a3f,#7a4c28);border-radius:3px;position:relative;box-shadow:0 4px 6px #0005}
 #tray i{position:absolute;bottom:8px;height:9px;border-radius:5px}
 </style>
@@ -112,6 +113,7 @@ textarea::placeholder{color:#ffffff55}
 
     <button id="send">칠판에 쓰기 ✎</button>
     <div id="err"></div>
+    <button class="forget" id="forget2" type="button" hidden>👥 친구와 같이 쓰는 기기예요 (연결 끊기)</button>
   </div>
 
   <div id="done">
@@ -121,75 +123,10 @@ textarea::placeholder{color:#ffffff55}
     <div id="doneNote" class="chalk"><div id="doneText"></div><div id="doneName"></div></div>
     <button id="again">내 글 고치기 ✎</button>
     <p style="font-size:12px;color:#ffffff99;margin-top:12px">한 사람이 글 1개만 남길 수 있어요. 고치기는 언제든 할 수 있어요.</p>
+    <button class="forget" type="button">👥 친구와 같이 쓰는 기기예요 (연결 끊기)</button>
   </div>
 </div>
 <div id="tray"><i style="left:14%;width:46px;background:#fbf8ee"></i><i style="left:28%;width:30px;background:#ffb3c7;transform:rotate(-5deg)"></i><i style="left:70%;width:38px;background:#a8dcff"></i></div>
-<script>
-const C=window.CONFIG, $=s=>document.querySelector(s);
-const MAX=C.maxChars||80;
-document.title=C.writeTitle; $("#title").textContent=C.writeTitle; $("#subtitle").textContent=C.writeSub||"";
-/* 행사 코드: QR 주소의 ?c= 를 기억해 두고, 주소창에서는 지워요 (주소만 퍼져도 남이 못 들어오게) */
-const qs=new URLSearchParams(location.search);
-let CODE=(qs.get("c")||"").trim().toUpperCase();
-try{ if(CODE) localStorage.setItem("uri2026Code",CODE); else CODE=localStorage.getItem("uri2026Code")||""; }catch(e){}
-if(qs.has("c")) history.replaceState(null,"","/letter.html");
-const H=()=>({"Content-Type":"application/json","x-event-code":CODE});
-function showGate(msg){ $("#gate").hidden=false; $("#form").style.display="none"; $("#privacy").hidden=true; $("#codeErr").textContent=msg||""; }
-$("#codeGo").onclick=()=>{ const v=$("#codeIn").value.trim().toUpperCase(); if(!v) return; try{ localStorage.setItem("uri2026Code",v); }catch(e){} location.href="/letter.html?c="+encodeURIComponent(v); };
-fetch("/api/info").then(r=>r.json()).then(i=>{
-  if(i.retainDays) $("#retainTxt").textContent=`쓴 날부터 ${i.retainDays}일이 지나면`;
-  if(!i.photos){ document.querySelectorAll("#photoLbl,#photoPrev").forEach(e=>e.remove()); [...document.querySelectorAll(".lbl")].find(e=>e.textContent.includes("사진"))?.remove(); }
-}).catch(()=>{});
-const ta=$("#msg"), cnt=$("#cnt"), nameEl=$("#name"), err=$("#err");
-ta.maxLength=MAX;
-
-const COLORS=["하양","노랑","분홍","하늘","연두","주황"];
-let color=Math.floor(Math.random()*6);
-COLORS.forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.title=n; b.setAttribute("aria-label",n+" 분필"); b.style.background=`var(--c${i})`; b.onclick=()=>{color=i;paint();}; $("#dots").appendChild(b); });
-function paint(){ document.body.style.setProperty("--c",`var(--c${color})`); [...$("#dots").children].forEach((b,i)=>b.classList.toggle("on",i===color)); }
-paint();
-
-const count=()=>{ const l=ta.value.length; cnt.textContent=`${l} / ${MAX}`; cnt.classList.toggle("warn",l>=MAX-5); };
-ta.addEventListener("input",count); count();
-
-let photo=null, hadPhoto=false, editing=false;
-function compress(file,max,q){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>=h&&w>max){h=h*max/w;w=max;} else if(h>max){w=w*max/h;h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=e.target.result; }; r.readAsDataURL(file); }); }
-$("#photoInput").addEventListener("change",async e=>{ const f=e.target.files[0]; if(!f) return;
-  try{ photo=await compress(f,500,.65); if(photo.length>200000) photo=await compress(f,360,.6); showPhoto(photo); }catch(x){ err.textContent="사진을 읽지 못했어요"; } });
-function clearPhoto(){ photo=null; hadPhoto=false; $("#photoInput").value=""; $("#photoPrev").style.display="none"; $("#photoLbl").style.display="flex"; }
-$("#photoDel").onclick=clearPhoto;
-
-function setEditing(on){ editing=on; $("#send").textContent=on?"고쳐 쓰기 ✎":"칠판에 쓰기 ✎";
-  const n=$("#notice"); if(on){ n.hidden=false; n.textContent="이미 남긴 글이 있어요. 한 사람에 1개라서, 고쳐 쓰기만 할 수 있어요 ✎"; } }
-function showPhoto(src){ $("#prevImg").src=src; $("#photoPrev").style.display="block"; $("#photoLbl").style.display="none"; }
-if(!CODE) showGate();
-else fetch("/api/mine",{headers:H()}).then(async r=>{ const j=await r.json(); if(r.status===403||r.status===429){ showGate(j.error); throw 0; } return j; }).then(j=>{
-  if(j.revoked){ $("#form").innerHTML='<p style="text-align:center;font-family:Gaegu;font-size:22px;margin:30px 0">선생님이 이 기기의 글을 지웠어요.<br>궁금한 점은 선생님께 여쭤 보세요.</p>'; return; }
-  const m=j.mine; if(!m) return;
-  ta.value=m.text; nameEl.value=m.name==="익명"?"":m.name; if(Number.isInteger(m.color)){ color=m.color; paint(); } count();
-  if(m.photo){ hadPhoto=true; showPhoto(m.photo); }
-  setEditing(true);
-  if(m.hold) $("#notice").textContent+=" (지금은 선생님 확인을 기다리는 중이에요)";
-  if(m.hidden) $("#notice").textContent+=" (선생님이 잠시 숨겨 둔 글이에요)";
-}).catch(()=>{});
-$("#send").addEventListener("click",async()=>{
-  const text=ta.value.trim(), name=nameEl.value.trim()||"익명";
-  if(!text){ err.textContent="한 마디를 써 주세요 ✎"; ta.focus(); return; }
-  err.textContent=""; $("#send").disabled=true; $("#send").textContent="쓰는 중…";
-  try{
-    const r=await fetch("/api/letters",{method:"POST",headers:H(),body:JSON.stringify({name,text:text.slice(0,MAX),color,photo:(hadPhoto&&!photo)?"keep":photo})});
-    const j=await r.json().catch(()=>({}));
-    if(r.status===403&&j.code==="bad_code"){ showGate(j.error); return; }
-    if(!r.ok) throw new Error(j.error||"보내지 못했어요");
-    $("#doneText").textContent=text; $("#doneName").textContent="— "+name;
-    $("#doneTitle").textContent=j.edited?"고쳐 썼어요!":"칠판에 썼어요!";
-    $("#doneSub").textContent=j.hidden?"선생님이 잠시 숨겨 둔 글이에요":j.pending?"선생님이 확인한 뒤 칠판에 써져요 ✋":"앞 화면을 봐 주세요 👀";
-    if(photo){ hadPhoto=true; photo=null; } setEditing(true);
-    $("#form").style.display="none"; $("#done").style.display="block"; scrollTo(0,0);
-  }catch(e){ console.error(e); err.textContent=(e.message&&e.message!=="Failed to fetch")?e.message:"보내지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요."; }
-  $("#send").disabled=false; $("#send").textContent=editing?"고쳐 쓰기 ✎":"칠판에 쓰기 ✎";
-});
-$("#again").onclick=()=>{ $("#done").style.display="none"; $("#form").style.display="block"; scrollTo(0,0); };
-</script>
+<script src="js/write.js"></script>
 </body>
 </html>

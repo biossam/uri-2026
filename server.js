@@ -14,7 +14,9 @@ const QRErrorCorrectLevel = require("./vendor/QRCode/QRErrorCorrectLevel");
 
 /* ── 설정 (Render 환경변수로 바꿀 수 있어요) ── */
 const PORT = process.env.PORT || 3000;
-const ADMIN_PW = process.env.ADMIN_PW || "1234";
+const ADMIN_PW = String(process.env.ADMIN_PW || "");
+// GitHub에 코드가 공개돼 있어서 기본 비밀번호는 누구나 알 수 있어요 → 실제 서버에서는 8자 이상이 아니면 관리자 화면을 막아요
+const WEAK_PW = ADMIN_PW.length < 8 || /^(\d)\1+$|^(1234|12345678|password|admin)/i.test(ADMIN_PW);
 const MAX_CHARS = +process.env.MAX_CHARS || 80;
 const MAX_LETTERS = +process.env.MAX_LETTERS || 600;          // 게시판 전체 글 수 한도
 const REVIEW_ALL = process.env.REVIEW_ALL === "1";            // 1이면 모든 글을 확인 후 공개
@@ -24,6 +26,7 @@ const EXTRA_BANNED = (process.env.BANNED_WORDS || "").split(",").map(s => s.trim
 const RETAIN_DAYS = process.env.RETAIN_DAYS === undefined ? 3 : +process.env.RETAIN_DAYS; // 쓴 지 며칠 뒤 자동 삭제 (0 = 끄기)
 const MAX_PHOTO = 200 * 1024;                                  // 사진 1장 data URL 최대 길이
 const MAX_SSE = 400;                                           // 앞 화면 동시 연결 한도
+const MAX_SSE_PER_IP = 8;                                      // 한 곳(IP)에서 여는 앞 화면 수 한도
 const PUBLIC = path.join(__dirname, "public");
 const DATA_DIR = path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "letters.json");
@@ -32,7 +35,7 @@ const IS_PROD = !!process.env.RENDER;
 /* ── 저장 ── */
 // letters: {key, tok(수정 열쇠의 해시), name, text, color, photo, timestamp, edited, hidden, hold}
 //   hidden = 선생님이 숨김 / hold = 확인 대기(욕설 의심·사진)
-let db = { letters: [], revoked: [], code: "" };
+let db = { letters: [], revoked: [], code: "", closed: false };
 try { const d = JSON.parse(fs.readFileSync(DATA_FILE, "utf8")); if (d && Array.isArray(d.letters)) db = Object.assign(db, d); } catch (e) {}
 // 행사 코드: 환경변수 EVENT_CODE가 있으면 그것, 없으면 처음 켤 때 만들어 저장 (헷갈리는 0/O, 1/I/L 뺌)
 function newCode() { const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let c = ""; for (const b of crypto.randomBytes(6)) c += A[b % A.length]; return c; }
@@ -60,6 +63,7 @@ function holdFor(L) {
 
 /* ── 실시간 (SSE) ── */
 const clients = new Set();
+function dropAll() { for (const res of clients) { try { res.end(); } catch (e) {} } clients.clear(); }   // 코드가 바뀌거나 칠판을 닫으면 모두 끊기
 function broadcast(type, data) {
   const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) { try { res.write(msg); } catch (e) {} }
@@ -122,6 +126,16 @@ const newPerIp = makeLimiter(60 * 1000, 30);      // 학교는 한 IP를 같이 
 const newGlobal = makeLimiter(60 * 1000, 120);    // 전체 새 글: 1분에 120개
 const editPerTok = makeLimiter(10 * 1000, 2);     // 고치기: 10초에 2번
 const adminFail = new Map();                      // ip → {n, until}
+// 로그인하면 12시간짜리 관리자 열쇠(세션)를 줘요. 비밀번호 잠금은 '로그인'에만 걸려서,
+// 같은 학교 와이파이에서 누가 비밀번호를 틀려도 이미 들어와 있는 선생님은 쫓겨나지 않아요.
+const sessions = new Map();                       // 열쇠 해시 → 만료 시각
+function newSession() { const t = crypto.randomBytes(32).toString("hex"); sessions.set(sha(t), Date.now() + 12 * 3600 * 1000); return t; }
+function sessionOk(req) {
+  const t = String(req.headers["x-admin-session"] || ""); if (!/^[a-f0-9]{64}$/.test(t)) return false;
+  const exp = sessions.get(sha(t)); if (!exp) return false;
+  if (exp < Date.now()) { sessions.delete(sha(t)); return false; }
+  return true;
+}
 function adminLocked(ip) { const a = adminFail.get(ip); return a && a.until > Date.now(); }
 function adminFailed(ip) {
   const a = adminFail.get(ip) || { n: 0, until: 0 }; a.n++;
@@ -160,7 +174,7 @@ const SEC = {
   "Referrer-Policy": "no-referrer",
   "X-Frame-Options": "DENY",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   ...(IS_PROD ? { "Strict-Transport-Security": "max-age=15552000" } : {}),
 };
 function send(res, code, obj, extra = {}) { res.writeHead(code, { ...SEC, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extra }); res.end(JSON.stringify(obj)); }
@@ -180,10 +194,9 @@ function myLetter(req) {
   const h = sha(tok);
   return { tok, L: db.letters.find(x => x.tok === h) || null, revoked: db.revoked.includes(h) };
 }
-function isAdmin(req) {
-  const k = String(req.headers["x-admin-key"] || "");
-  const a = Buffer.from(sha(k)), b = Buffer.from(sha(ADMIN_PW));
-  return crypto.timingSafeEqual(a, b);
+function pwOk(k) {
+  const a = Buffer.from(sha(String(k || ""))), b = Buffer.from(sha(ADMIN_PW));
+  return ADMIN_PW.length > 0 && crypto.timingSafeEqual(a, b);
 }
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml; charset=utf-8", ".ico": "image/x-icon" };
 function serveStatic(req, res, urlPath) {
@@ -206,16 +219,19 @@ const server = http.createServer(async (req, res) => {
     if (p === "/healthz") return send(res, 200, { ok: true });
 
     // 화면이 처음 물어보는 기본 정보 (코드 없이)
-    if (p === "/api/info" && req.method === "GET") return send(res, 200, { retainDays: RETAIN_DAYS, photos: PHOTOS, photoReview: PHOTO_REVIEW, reviewAll: REVIEW_ALL, maxChars: MAX_CHARS });
+    if (p === "/api/info" && req.method === "GET") return send(res, 200, { closed: !!db.closed, retainDays: RETAIN_DAYS, photos: PHOTOS, photoReview: PHOTO_REVIEW, reviewAll: REVIEW_ALL, maxChars: MAX_CHARS });
 
     // 여기부터는 행사 코드가 있어야 해요 (보기·쓰기·QR)
-    if (p === "/api/stream" || p === "/api/mine" || p === "/api/letters" || p === "/api/qr.svg" || p === "/api/join") {
+    if (p === "/api/stream" || p === "/api/mine" || p === "/api/letters" || p === "/api/qr.svg" || p === "/api/join" || p === "/api/forget") {
       const ip = clientIp(req);
       if (!codeOk(req, url)) {
         if (!codeFail(ip)) return send(res, 429, { error: "코드를 여러 번 틀렸어요. 10분 뒤에 다시 해 주세요" });
         return send(res, 403, { error: "행사 코드가 맞지 않아요. 앞 화면의 QR을 다시 찍어 주세요", code: "bad_code" });
       }
+      if (db.closed && p !== "/api/forget") return send(res, 403, { error: "방명록이 닫혔어요. 참여해 줘서 고마워요!", code: "closed" });
       if (p === "/api/join") return send(res, 200, { ok: true });
+      // 공용 기기: 이 기기와 내 글의 연결 끊기 (글은 그대로 남고, 다음 친구가 새로 쓸 수 있어요)
+      if (p === "/api/forget" && req.method === "POST") return send(res, 200, { ok: true }, { "Set-Cookie": `uri_tok=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${IS_PROD ? "; Secure" : ""}` });
       if (p === "/api/qr.svg") {
         const host = String(req.headers.host || "").replace(/[^a-z0-9.:-]/gi, "");
         const proto = IS_PROD ? "https" : (req.headers["x-forwarded-proto"] === "https" ? "https" : "http");
@@ -227,9 +243,11 @@ const server = http.createServer(async (req, res) => {
     // 앞 화면 실시간 연결
     if (p === "/api/stream" && req.method === "GET") {
       if (clients.size >= MAX_SSE) return send(res, 503, { error: "busy" });
+      const ip = clientIp(req);
+      if ([...clients].filter(r => r._ip === ip).length >= MAX_SSE_PER_IP) return send(res, 429, { error: "앞 화면을 너무 많이 열었어요" });
       res.writeHead(200, { ...SEC, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
       res.write(`retry: 3000\nevent: init\ndata: ${JSON.stringify(db.letters.filter(visible).map(pub))}\n\n`);
-      clients.add(res);
+      res._ip = ip; clients.add(res);
       req.on("close", () => clients.delete(res));
       return;
     }
@@ -290,29 +308,43 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, edited: false, pending: !!hold }, { "Set-Cookie": tokCookie(tok) });
     }
 
-    // 관리자
-    if (p.startsWith("/api/admin/")) {
+    // 관리자 로그인 (비밀번호 → 관리자 열쇠)
+    if (p === "/api/admin/login" && req.method === "POST") {
       const ip = clientIp(req);
-      if (adminLocked(ip)) return send(res, 429, { error: "비밀번호를 여러 번 틀려서 10분 동안 잠겼어요" });
-      if (!isAdmin(req)) { adminFailed(ip); return send(res, 401, { error: "비밀번호가 틀렸어요" }); }
+      if (IS_PROD && WEAK_PW) return send(res, 503, { error: "Render 환경변수 ADMIN_PW를 8자 이상(글자+숫자)으로 정해 주세요. 그 전에는 관리자 화면이 잠겨 있어요.", code: "weak_pw" });
+      if (adminLocked(ip)) return send(res, 429, { error: "비밀번호를 여러 번 틀려서 이 기기는 10분 동안 잠겼어요" });
+      const b = await readBody(req, 2 * 1024);
+      if (!pwOk(b.pw)) { adminFailed(ip); return send(res, 401, { error: "비밀번호가 틀렸어요 (5번 틀리면 10분 잠겨요)" }); }
       adminFail.delete(ip);
+      return send(res, 200, { session: newSession(), weak: WEAK_PW });
+    }
+
+    // 관리자 기능 (관리자 열쇠 필요)
+    if (p.startsWith("/api/admin/")) {
+      if (!sessionOk(req)) return send(res, 401, { error: "다시 로그인해 주세요" });
       const act = p.slice("/api/admin/".length);
       if (act === "check") return send(res, 200, { ok: true });
-      if (act === "info") return send(res, 200, { code: eventCode(), fromEnv: !!ENV_CODE, retainDays: RETAIN_DAYS });
+      if (act === "info") return send(res, 200, { code: eventCode(), fromEnv: !!ENV_CODE, retainDays: RETAIN_DAYS, closed: !!db.closed, viewers: clients.size, weak: WEAK_PW });
       if (act === "letters" && req.method === "GET") return send(res, 200, db.letters.map(adminView));
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       const b = await readBody(req, 10 * 1024);
+      if (act === "logout") { sessions.delete(sha(String(req.headers["x-admin-session"]))); return send(res, 200, { ok: true }); }
+      if (act === "close") { db.closed = !!b.closed; save(); if (db.closed) dropAll(); return send(res, 200, { ok: true, closed: db.closed }); }
+      if (act === "rotate-code") {
+        if (ENV_CODE) return send(res, 400, { error: "코드를 Render 환경변수 EVENT_CODE로 정해 두셨어요. Render에서 바꿔 주세요." });
+        db.code = newCode(); save(); dropAll(); return send(res, 200, { ok: true, code: db.code });
+      }
       const L = typeof b.key === "string" ? db.letters.find(x => x.key === b.key) : null;
       if (act === "show" && L) { const was = visible(L); L.hidden = false; L.hold = ""; L.textOk = true; L.photoOk = true; save(); announce(L, was); return send(res, 200, { ok: true }); }
       if (act === "hide" && L) { const was = visible(L); L.hidden = true; save(); announce(L, was); return send(res, 200, { ok: true }); }
       if (act === "delete" && L) {
         const was = visible(L);
         db.letters = db.letters.filter(x => x !== L);
-        if (b.block) db.revoked.push(L.tok);          // 이 기기는 다시 못 쓰게
+        if (b.block && !db.revoked.includes(L.tok)) db.revoked.push(L.tok);          // 이 기기는 다시 못 쓰게
         save(); if (was) broadcast("remove", { key: L.key }); return send(res, 200, { ok: true });
       }
       if (act === "clear-photos") { db.letters.forEach(x => { x.photo = null; x.hold = holdFor(x); }); save(); broadcast("init", db.letters.filter(visible).map(pub)); return send(res, 200, { ok: true }); }
-      if (act === "reset") { db = { letters: [], revoked: [], code: ENV_CODE ? "" : newCode() }; save(); broadcast("init", []); return send(res, 200, { ok: true }); }
+      if (act === "reset") { db = { letters: [], revoked: [], code: ENV_CODE ? "" : newCode(), closed: false }; save(); dropAll(); return send(res, 200, { ok: true }); }
       return send(res, 404, { error: "없는 기능이에요" });
     }
 
