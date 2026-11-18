@@ -44,6 +44,14 @@
 | `BANNED_WORDS` | 더 거를 낱말 (쉼표로 구분) | |
 | `MAX_CHARS` | 글자 수 (public/config.js 와 같게) | 80 |
 
+## onpod에 올리기 (국내 서버 · 무료)
+```
+onpod login
+onpod deploy            # 제안 확인
+onpod deploy --yes      # 올리기
+onpod app env set uri-2026 ADMIN_PW=길고-어려운-비번 EVENT_CODE=URI2026
+```
+
 ## Render 설정
 - 환경변수 `ADMIN_PW` 에 관리자 비밀번호를 넣어 주세요. (없으면 1234)
 - 무료 서버는 15분 동안 아무도 안 쓰면 잠들어요. 행사 시작 몇 분 전에 앞 화면을 먼저 열어 두세요.

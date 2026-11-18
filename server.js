@@ -30,7 +30,7 @@ const MAX_SSE_PER_IP = 8;                                      // 한 곳(IP)에
 const PUBLIC = path.join(__dirname, "public");
 const DATA_DIR = path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "letters.json");
-const IS_PROD = !!process.env.RENDER;
+const IS_PROD = !!process.env.RENDER || process.env.NODE_ENV === "production";   // Render·onpod(Dockerfile) 실제 서버
 
 /* ── 저장 ── */
 // letters: {key, tok(수정 열쇠의 해시), name, text, color, photo, timestamp, edited, hidden, hold}
