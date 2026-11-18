@@ -311,7 +311,7 @@ const server = http.createServer(async (req, res) => {
     // 관리자 로그인 (비밀번호 → 관리자 열쇠)
     if (p === "/api/admin/login" && req.method === "POST") {
       const ip = clientIp(req);
-      if (IS_PROD && WEAK_PW) return send(res, 503, { error: "Render 환경변수 ADMIN_PW를 8자 이상(글자+숫자)으로 정해 주세요. 그 전에는 관리자 화면이 잠겨 있어요.", code: "weak_pw" });
+      if (IS_PROD && WEAK_PW) return send(res, 503, { error: "서버 환경변수 ADMIN_PW를 8자 이상(글자+숫자)으로 정해 주세요 (Render는 Environment, onpod은 onpod app env set). 그 전에는 관리자 화면이 잠겨 있어요.", code: "weak_pw" });
       if (adminLocked(ip)) return send(res, 429, { error: "비밀번호를 여러 번 틀려서 이 기기는 10분 동안 잠겼어요" });
       const b = await readBody(req, 2 * 1024);
       if (!pwOk(b.pw)) { adminFailed(ip); return send(res, 401, { error: "비밀번호가 틀렸어요 (5번 틀리면 10분 잠겨요)" }); }
