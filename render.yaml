@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: uri-2026
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: ADMIN_PW
+        sync: false

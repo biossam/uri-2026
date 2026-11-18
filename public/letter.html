@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>방명록 남기기</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<script src="config.js"></script>
+<style>
+:root{--c0:#fbf8ee;--c1:#ffe98a;--c2:#ffb3c7;--c3:#a8dcff;--c4:#bff0a6;--c5:#ffc89a;--board:#2f4b3c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Noto Sans KR",sans-serif;color:var(--c0);min-height:100vh;padding:14px 12px 30px;
+  background:linear-gradient(180deg,#b07a4a,#8a5a33 60%,#6e4526) fixed}
+.wrap{max-width:460px;margin:0 auto;background:radial-gradient(60% 40% at 30% 20%,#ffffff12,transparent 70%),var(--board);
+  border-radius:8px;padding:22px 18px 26px;box-shadow:inset 0 0 40px #0008;position:relative;overflow:hidden;min-height:calc(100vh - 44px)}
+.wrap::before{content:"";position:absolute;inset:0;opacity:.14;pointer-events:none;mix-blend-mode:screen;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.4 -.5'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E")}
+.chalk{filter:url(#chalkF)}
+header{text-align:center;margin:4px 0 18px;position:relative}
+h1{font-family:Gaegu,cursive;font-weight:700;font-size:34px;line-height:1.1}
+#subtitle{font-family:Gaegu,cursive;color:var(--c1);font-size:18px;margin-top:2px}
+.uline{display:block;width:70%;height:12px;margin:2px auto 0}
+.lbl{font-family:Gaegu,cursive;font-weight:700;font-size:19px;color:var(--c3);margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.dots{display:flex;gap:10px;flex-wrap:wrap}
+.dots button{width:44px;height:18px;border-radius:9px;border:0;cursor:pointer;box-shadow:0 2px 3px #0005;transform:rotate(-4deg);transition:transform .15s}
+.dots button.on{transform:rotate(-4deg) translateY(-5px) scale(1.12);outline:2px dashed #fff8;outline-offset:3px}
+#writeBox{position:relative;border:2px dashed #ffffff40;border-radius:10px;padding:10px 12px 8px;margin-top:6px}
+textarea{width:100%;min-height:150px;border:0;background:transparent;resize:none;font-family:"Nanum Pen Script",cursive;font-size:32px;line-height:1.15;color:var(--c);outline:none;caret-color:#fff}
+textarea::placeholder{color:#ffffff55}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:10px}
+#cnt{font-size:12px;color:#ffffff99;font-weight:700}#cnt.warn{color:var(--c2)}
+.meta label{display:flex;align-items:center;gap:4px;font-family:Gaegu;font-weight:700;color:var(--c);font-size:20px}
+#name{border:0;border-bottom:2px dashed #ffffff55;background:transparent;font-family:Gaegu,cursive;font-weight:700;font-size:20px;width:120px;color:var(--c);outline:none;text-align:right}
+#name::placeholder{color:#ffffff55}
+#photoLbl{display:flex;align-items:center;gap:12px;cursor:pointer;border:2px dashed #ffffff40;border-radius:10px;padding:12px}
+#photoLbl .ic{font-size:26px}
+#photoLbl b{display:block;font-family:Gaegu;font-size:19px}#photoLbl small{color:#ffffff99;font-size:12px}
+#photoPrev{display:none;position:relative;text-align:center}
+#photoPrev .pol{display:inline-block;background:#fff;padding:8px 8px 26px;transform:rotate(-3deg);box-shadow:0 6px 12px #0007;position:relative}
+#photoPrev .pol::after{content:"";position:absolute;left:50%;top:-10px;width:22px;height:22px;border-radius:50%;transform:translateX(-50%);background:radial-gradient(circle at 35% 30%,#fff9,#ff6b6b 55%);box-shadow:0 2px 4px #0006}
+#prevImg{max-width:220px;max-height:200px;display:block}
+#photoDel{position:absolute;right:-10px;top:-10px;width:30px;height:30px;border-radius:50%;border:0;background:#000a;color:#fff;cursor:pointer}
+#photoPrev small{display:block;color:#ffffff99;font-size:12px;margin-top:12px}
+#send,#again{width:100%;margin-top:22px;padding:15px;border:0;border-radius:12px;background:var(--c1);color:#3a3020;font:700 24px Gaegu,cursive;cursor:pointer;box-shadow:0 5px 0 #c9a93a;transition:transform .1s}
+#send:active,#again:active{transform:translateY(3px);box-shadow:0 2px 0 #c9a93a}
+#send:disabled{opacity:.6}
+#err{min-height:1.4em;color:var(--c2);font-size:13px;text-align:center;margin-top:10px;font-weight:700}
+#done{display:none;text-align:center;padding-top:10px}
+#done h2{font-family:Gaegu;font-weight:700;font-size:32px;margin:6px 0 2px}
+#done p{color:var(--c1);font-family:Gaegu;font-size:19px;margin-bottom:20px}
+#doneNote{border:2px dashed #ffffff40;border-radius:10px;padding:18px 16px 12px;margin:0 auto 6px;text-align:left;transform:rotate(-2deg);color:var(--c)}
+#doneText{font-family:"Nanum Pen Script";font-size:30px;line-height:1.15;white-space:pre-wrap;word-break:keep-all}
+#doneName{font-family:Gaegu;font-weight:700;font-size:20px;text-align:right;margin-top:6px}
+.demo{background:#ffe9a8;color:#7a5200;font-size:12px;font-weight:700;text-align:center;border-radius:6px;padding:8px;margin-bottom:12px;position:relative}
+#tray{max-width:460px;margin:8px auto 0;height:14px;background:linear-gradient(#9c6a3f,#7a4c28);border-radius:3px;position:relative;box-shadow:0 4px 6px #0005}
+#tray i{position:absolute;bottom:8px;height:9px;border-radius:5px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="chalkF" x="-5%" y="-5%" width="110%" height="110%">
+    <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="3" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2" xChannelSelector="R" yChannelSelector="G" result="d"/>
+    <feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="1" seed="9" result="g"/>
+    <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -2.2 1.6" result="holes"/>
+    <feComposite in="d" in2="holes" operator="in"/>
+  </filter>
+</svg>
+<div class="wrap">
+  <header>
+    <h1 id="title" class="chalk">방명록 남기기</h1>
+    <svg class="uline chalk" viewBox="0 0 200 12" preserveAspectRatio="none"><path d="M3 7c40-4 90-5 130-2s50 2 64-1" fill="none" stroke="#ffe98a" stroke-width="3" stroke-linecap="round"/></svg>
+    <p id="subtitle" class="chalk"></p>
+  </header>
+
+  <div id="form">
+    <div class="lbl chalk"><span>① 분필 색 고르기</span></div>
+    <div class="dots" id="dots"></div>
+
+    <div class="lbl chalk"><span>② 한 마디 쓰기</span><span id="cnt"></span></div>
+    <div id="writeBox">
+      <textarea id="msg" class="chalk" placeholder="여기에 분필로 써 보세요 ✎"></textarea>
+      <div class="meta"><span></span><label class="chalk">— <input id="name" maxlength="10" placeholder="이름"></label></div>
+    </div>
+
+    <div class="lbl chalk"><span>③ 사진 붙이기 (선택)</span></div>
+    <label id="photoLbl"><span class="ic">📷</span><span><b>사진을 자석으로 붙여요</b><small>함께 찍은 사진이나 오늘 만든 작품</small></span>
+      <input id="photoInput" type="file" accept="image/*" hidden></label>
+    <div id="photoPrev"><div class="pol"><img id="prevImg" alt="미리보기"><button id="photoDel" type="button">✕</button></div><small>글 옆에 붙어요</small></div>
+
+    <button id="send">칠판에 쓰기 ✎</button>
+    <div id="err"></div>
+  </div>
+
+  <div id="done">
+    <span style="font-size:44px">🎉</span>
+    <h2 class="chalk">칠판에 썼어요!</h2>
+    <p class="chalk">앞 화면을 봐 주세요 👀</p>
+    <div id="doneNote" class="chalk"><div id="doneText"></div><div id="doneName"></div></div>
+    <button id="again">하나 더 쓰기</button>
+  </div>
+</div>
+<div id="tray"><i style="left:14%;width:46px;background:#fbf8ee"></i><i style="left:28%;width:30px;background:#ffb3c7;transform:rotate(-5deg)"></i><i style="left:70%;width:38px;background:#a8dcff"></i></div>
+<script>
+const C=window.CONFIG, $=s=>document.querySelector(s);
+const MAX=C.maxChars||80;
+document.title=C.writeTitle; $("#title").textContent=C.writeTitle; $("#subtitle").textContent=C.writeSub||"";
+const ta=$("#msg"), cnt=$("#cnt"), nameEl=$("#name"), err=$("#err");
+ta.maxLength=MAX;
+
+const COLORS=["하양","노랑","분홍","하늘","연두","주황"];
+let color=Math.floor(Math.random()*6);
+COLORS.forEach((n,i)=>{ const b=document.createElement("button"); b.type="button"; b.title=n; b.setAttribute("aria-label",n+" 분필"); b.style.background=`var(--c${i})`; b.onclick=()=>{color=i;paint();}; $("#dots").appendChild(b); });
+function paint(){ document.body.style.setProperty("--c",`var(--c${color})`); [...$("#dots").children].forEach((b,i)=>b.classList.toggle("on",i===color)); }
+paint();
+
+const count=()=>{ const l=ta.value.length; cnt.textContent=`${l} / ${MAX}`; cnt.classList.toggle("warn",l>=MAX-5); };
+ta.addEventListener("input",count); count();
+
+let photo=null;
+function compress(file,max,q){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>=h&&w>max){h=h*max/w;w=max;} else if(h>max){w=w*max/h;h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=e.target.result; }; r.readAsDataURL(file); }); }
+$("#photoInput").addEventListener("change",async e=>{ const f=e.target.files[0]; if(!f) return;
+  try{ photo=await compress(f,500,.65); $("#prevImg").src=photo; $("#photoPrev").style.display="block"; $("#photoLbl").style.display="none"; }catch(x){ err.textContent="사진을 읽지 못했어요"; } });
+function clearPhoto(){ photo=null; $("#photoInput").value=""; $("#photoPrev").style.display="none"; $("#photoLbl").style.display="flex"; }
+$("#photoDel").onclick=clearPhoto;
+
+$("#send").addEventListener("click",async()=>{
+  const text=ta.value.trim(), name=nameEl.value.trim()||"익명";
+  if(!text){ err.textContent="한 마디를 써 주세요 ✎"; ta.focus(); return; }
+  err.textContent=""; $("#send").disabled=true; $("#send").textContent="쓰는 중…";
+  try{
+    const r=await fetch("/api/letters",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,text:text.slice(0,MAX),color,photo})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error||"보내지 못했어요");
+    $("#doneText").textContent=text; $("#doneName").textContent="— "+name;
+    $("#form").style.display="none"; $("#done").style.display="block"; scrollTo(0,0);
+  }catch(e){ console.error(e); err.textContent=(e.message&&e.message!=="Failed to fetch")?e.message:"보내지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요."; }
+  $("#send").disabled=false; $("#send").textContent="칠판에 쓰기 ✎";
+});
+$("#again").onclick=()=>{ ta.value=""; count(); clearPhoto(); color=Math.floor(Math.random()*6); paint(); $("#done").style.display="none"; $("#form").style.display="block"; scrollTo(0,0); };
+</script>
+</body>
+</html>
