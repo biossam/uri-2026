@@ -288,7 +288,7 @@ function buildNote(L,cell,W,H,delay){
       ${mk?`<span class="mark" style="left:6%;bottom:4%">${mk}</span>`:""}
     </div>
     ${hasPhoto?`<div class="pol" style="--pr:${(sd.pr*8).toFixed(1)}deg;--mag:${MAGS[sd.mag]};right:2%;top:8%;width:32%;aspect-ratio:.86"><img src="${esc(L.photo)}" alt=""></div>`:""}`;
-  notesEl.appendChild(el); fitText(el,h,w,hasPhoto); return el;
+  el._cell=cell; notesEl.appendChild(el); fitText(el,h,w,hasPhoto); return el;
 }
 function fitText(el,h,w,hasPhoto){
   const txt=el.querySelector(".txt"), from=el.querySelector(".from"), mk=el.querySelector(".mark");
@@ -335,6 +335,12 @@ async function pumpLive(){
     await wait(1200);
   }
   pumping=false;
+}
+function updateLetter(L){
+  const i=letters.findIndex(x=>x.key===L.key); if(i<0) return onLetter(L,true);
+  L.seed=letters[i].seed; letters[i]=L; rebuildPages();
+  const el=notesEl.querySelector(`[data-key="${CSS.escape(L.key)}"]`);
+  if(el&&el._cell&&!busy){ const cell=el._cell; el.remove(); buildNote(L,cell,notesEl.clientWidth,notesEl.clientHeight,0); }
 }
 function removeLetter(key){
   const i=letters.findIndex(x=>x.key===key); if(i<0) return;
@@ -417,6 +423,7 @@ function connect(){
   es.addEventListener("init",e=>{ $("#dot").className="on"; $("#liveTxt").textContent="실시간 연결됨"; resetAll(JSON.parse(e.data)); });
   es.addEventListener("add",e=>onLetter(JSON.parse(e.data),true));
   es.addEventListener("remove",e=>removeLetter(JSON.parse(e.data).key));
+  es.addEventListener("update",e=>updateLetter(JSON.parse(e.data)));
   es.onerror=()=>{ $("#dot").className=""; $("#liveTxt").textContent="다시 연결하는 중…"; };
 }
 updateChrome();

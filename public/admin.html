@@ -12,7 +12,7 @@ body{font-family:"Noto Sans KR",sans-serif;background:#f1f4f0;color:#2b332e;padd
 h1{font-family:Jua;font-size:26px}h1 small{display:block;font:500 12px "Noto Sans KR";color:#8a83a3;margin-top:2px}
 .live{display:flex;align-items:center;gap:8px;font-weight:700;color:#4b6b58}
 #ldot{width:10px;height:10px;border-radius:50%;background:#bbb}#ldot.on{background:#38c98a}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
 .stats div{background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px #5b45b011}
 .stats b{font-family:Jua;font-size:28px;color:#2f4b3c;display:block}.stats span{color:#8a83a3;font-size:12px}
 .tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center}
@@ -28,6 +28,10 @@ tr.hid td{opacity:.45}
 td img{width:54px;height:54px;object-fit:cover;border-radius:8px;cursor:zoom-in}
 .act button{padding:5px 9px;border-radius:8px;border:1px solid #d6e2da;background:#fff;cursor:pointer;font:inherit;font-size:12px;margin:2px}
 .act .del{color:#d94848;border-color:#f3cccc}
+.act .ok{background:#2f4b3c;color:#fff;border-color:#2f4b3c}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:4px}
+.tag.hold{background:#fff3cd;color:#8a6100}.tag.hid{background:#eee;color:#666}.tag.ed{background:#e7f0ff;color:#2a5bb8}
+tr.hold td{background:#fffbea}
 .chip{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:middle;margin-right:6px}
 #modal,#zoom{position:fixed;inset:0;background:#2f4b3c99;display:none;align-items:center;justify-content:center;z-index:9}
 #modal .box{background:#fff;border-radius:16px;padding:22px;width:300px;text-align:center}
@@ -45,7 +49,7 @@ td img{width:54px;height:54px;object-fit:cover;border-radius:8px;cursor:zoom-in}
 </style>
 </head>
 <body>
-<div id="gate"><div class="box"><b>🔐 관리자</b><input id="gatePw" type="password" inputmode="numeric" maxlength="12"><div id="gateMsg"></div><button id="gateOk">열기</button></div></div>
+<div id="gate"><div class="box"><b>🔐 관리자</b><input id="gatePw" type="password" maxlength="64" autocomplete="current-password"><div id="gateMsg"></div><button id="gateOk">열기</button></div></div>
 
 <div class="top">
   <h1>✎ 우리들의 2026 · 방명록 관리<small id="pathInfo"></small></h1>
@@ -55,40 +59,44 @@ td img{width:54px;height:54px;object-fit:cover;border-radius:8px;cursor:zoom-in}
   <div><b id="s-total">0</b><span>전체</span></div>
   <div><b id="s-today">0</b><span>오늘</span></div>
   <div><b id="s-hour">0</b><span>최근 1시간</span></div>
+  <div><b id="s-hold">0</b><span>확인 대기</span></div>
   <div><b id="s-hidden">0</b><span>숨김</span></div>
 </div>
 <div class="tools">
   <input id="search" placeholder="이름이나 내용으로 찾기">
-  <button class="fb act" data-f="all">전체</button><button class="fb" data-f="today">오늘</button><button class="fb" data-f="hidden">숨김만</button>
+  <button class="fb act" data-f="all">전체</button><button class="fb" data-f="today">오늘</button><button class="fb" data-f="hold">확인 대기</button><button class="fb" data-f="hidden">숨김만</button>
   <button id="csv">⬇ CSV 저장</button>
   <button id="delPhotos" class="danger">🗑️ 사진 전체 삭제</button>
   <button id="reset" class="danger">🧹 전체 삭제(리셋)</button>
 </div>
 <table><thead><tr><th>#</th><th>시간</th><th>이름</th><th>사진</th><th>내용</th><th>관리</th></tr></thead><tbody id="rows"></tbody></table>
 
-<div id="modal"><div class="box"><b id="mTitle"></b><p id="mText"></p><div class="bb"><button id="mNo">취소</button><button id="mOk">삭제</button></div></div></div>
+<div id="modal"><div class="box"><b id="mTitle"></b><p id="mText"></p><div class="bb"><button id="mNo">취소</button><button id="mOk">삭제</button><button id="mBlock" style="background:#7a1f1f;color:#fff;display:none">삭제+차단</button></div></div></div>
 <div id="zoom"><img alt=""></div>
 
 <script>
 const $=s=>document.querySelector(s);
 const esc=t=>String(t??"").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
+const HOLD={words:"욕설 의심",photo:"사진 확인",all:"확인 대기"};
 const COLORS=["#e8e4d6","#ffe98a","#ffb3c7","#a8dcff","#bff0a6","#ffc89a"];
 let KEY=sessionStorage.getItem("uri2026Admin")||"", all=[], filter="all", timer=null;
 
 async function api(path,body){
   const r=await fetch("/api/admin/"+path,{method:body?"POST":"GET",headers:{"x-admin-key":KEY,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});
   if(r.status===401){ lock(); throw new Error("401"); }
+  if(r.status===429){ const j=await r.json().catch(()=>({})); lock(); $("#gateMsg").textContent=j.error||"잠시 뒤에 다시 해 주세요"; throw new Error("401"); }
   return r.json();
 }
 function lock(){ sessionStorage.removeItem("uri2026Admin"); KEY=""; clearInterval(timer); $("#gate").style.display="flex"; $("#gatePw").focus(); }
 async function tryKey(k){
   const r=await fetch("/api/admin/check",{headers:{"x-admin-key":k}});
+  if(r.status===429){ const j=await r.json().catch(()=>({})); $("#gateMsg").textContent=j.error; return "locked"; }
   if(!r.ok) return false;
   KEY=k; sessionStorage.setItem("uri2026Admin",k); $("#gate").style.display="none"; load(); clearInterval(timer); timer=setInterval(load,3000); return true;
 }
-const go=async()=>{ if(!(await tryKey($("#gatePw").value))){ $("#gateMsg").textContent="비밀번호가 틀렸어요"; $("#gatePw").value=""; } };
+const go=async()=>{ const ok=await tryKey($("#gatePw").value); if(ok===false){ $("#gateMsg").textContent="비밀번호가 틀렸어요 (5번 틀리면 10분 잠겨요)"; } if(ok!==true) $("#gatePw").value=""; };
 $("#gateOk").onclick=go; $("#gatePw").addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
-if(KEY) tryKey(KEY).then(ok=>{ if(!ok) lock(); }); else $("#gatePw").focus();
+if(KEY) tryKey(KEY).then(ok=>{ if(ok!==true) lock(); }); else $("#gatePw").focus();
 
 async function load(){
   try{ all=(await api("letters")).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
@@ -96,25 +104,27 @@ async function load(){
   catch(e){ if(e.message!=="401"){ $("#ldot").classList.remove("on"); $("#lstat").textContent="서버에 연결하지 못했어요"; } }
 }
 function confirmBox(title,text,ok){ $("#mTitle").textContent=title; $("#mText").textContent=text; $("#modal").style.display="flex";
-  $("#mOk").onclick=()=>{ $("#modal").style.display="none"; ok(); }; $("#mNo").onclick=()=>$("#modal").style.display="none"; }
+  const blockable=title.startsWith("🗑️ 글을"); $("#mBlock").style.display=blockable?"block":"none"; $("#modal .box").style.width=blockable?"360px":"300px";
+  $("#mOk").onclick=()=>{ $("#modal").style.display="none"; ok(false); }; $("#mBlock").onclick=()=>{ $("#modal").style.display="none"; ok(true); }; $("#mNo").onclick=()=>$("#modal").style.display="none"; }
 function stats(){
   const now=Date.now(), t0=new Date().setHours(0,0,0,0);
   $("#s-total").textContent=all.length; $("#s-today").textContent=all.filter(l=>l.timestamp>=t0).length;
-  $("#s-hour").textContent=all.filter(l=>l.timestamp>=now-36e5).length; $("#s-hidden").textContent=all.filter(l=>l.hidden).length;
+  $("#s-hour").textContent=all.filter(l=>l.timestamp>=now-36e5).length; $("#s-hidden").textContent=all.filter(l=>l.hidden).length; $("#s-hold").textContent=all.filter(l=>l.hold&&!l.hidden).length;
 }
 function render(){
   const q=$("#search").value.trim().toLowerCase(), t0=new Date().setHours(0,0,0,0);
   let items=all;
   if(filter==="today") items=items.filter(l=>l.timestamp>=t0);
   if(filter==="hidden") items=items.filter(l=>l.hidden);
+  if(filter==="hold") items=items.filter(l=>l.hold&&!l.hidden);
   if(q) items=items.filter(l=>(l.name+" "+l.text).toLowerCase().includes(q));
-  $("#rows").innerHTML=items.length?items.map((l,i)=>`<tr class="${l.hidden?"hid":""}">
+  $("#rows").innerHTML=items.length?items.map((l,i)=>`<tr class="${l.hidden?"hid":l.hold?"hold":""}">
     <td>${items.length-i}</td>
     <td>${l.timestamp?new Date(l.timestamp).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):""}</td>
     <td><span class="chip" style="background:${COLORS[l.color]??"#eee"}"></span>${esc(l.name)}</td>
     <td>${l.photo?`<img src="${esc(l.photo)}" data-zoom>`:""}</td>
-    <td class="msg">${esc(l.text)}</td>
-    <td class="act"><button data-k="${esc(l.key)}" data-a="hide">${l.hidden?"보이기":"숨기기"}</button><button class="del" data-k="${esc(l.key)}" data-a="del">삭제</button></td>
+    <td class="msg">${esc(l.text)}${l.hold&&!l.hidden?`<span class="tag hold">${HOLD[l.hold]||"확인 대기"}</span>`:""}${l.hidden?`<span class="tag hid">숨김</span>`:""}${l.edited?`<span class="tag ed">고침</span>`:""}</td>
+    <td class="act">${(l.hidden||l.hold)?`<button class="ok" data-k="${esc(l.key)}" data-a="show">${l.hold&&!l.hidden?"확인·공개":"보이기"}</button>`:`<button data-k="${esc(l.key)}" data-a="hide">숨기기</button>`}<button class="del" data-k="${esc(l.key)}" data-a="del">삭제</button></td>
   </tr>`).join(""):`<tr><td colspan="6" class="empty">아직 글이 없어요</td></tr>`;
 }
 $("#search").addEventListener("input",render);
@@ -123,12 +133,14 @@ $("#rows").addEventListener("click",async e=>{
   const z=e.target.closest("[data-zoom]"); if(z){ $("#zoom img").src=z.src; $("#zoom").style.display="flex"; return; }
   const b=e.target.closest("button[data-a]"); if(!b) return;
   const L=all.find(x=>x.key===b.dataset.k); if(!L) return;
-  if(b.dataset.a==="hide"){ await api("hide",{key:L.key,hidden:!L.hidden}); load(); }
-  else confirmBox("🗑️ 글을 삭제할까요?",`"${L.text.slice(0,30)}"\n삭제하면 되돌릴 수 없어요.`,async()=>{ await api("delete",{key:L.key}); load(); });
+  if(b.dataset.a==="hide"){ await api("hide",{key:L.key}); load(); }
+  else if(b.dataset.a==="show"){ await api("show",{key:L.key}); load(); }
+  else confirmBox("🗑️ 글을 삭제할까요?",`"${L.text.slice(0,30)}"\n삭제하면 되돌릴 수 없어요.\n\n[삭제] 그 학생이 새로 쓸 수 있어요\n[삭제+차단] 그 기기에서는 다시 못 써요`,async(block)=>{ await api("delete",{key:L.key,block}); load(); });
 });
 $("#zoom").onclick=()=>$("#zoom").style.display="none";
 $("#csv").onclick=()=>{
-  const rows=[["시간","이름","내용","숨김","사진"],...all.map(l=>[new Date(l.timestamp||0).toLocaleString("ko-KR"),l.name,l.text,l.hidden?"Y":"",l.photo?"Y":""])];
+  const cell=v=>{ v=String(v??""); return /^[=+\-@\t\r]/.test(v)?"'"+v:v; };   // 엑셀 수식 끼워 넣기 막기
+  const rows=[["시간","이름","내용","상태","사진","고친 시간"],...all.map(l=>[new Date(l.timestamp||0).toLocaleString("ko-KR"),cell(l.name),cell(l.text),l.hidden?"숨김":l.hold?"확인 대기":"공개",l.photo?"Y":"",l.edited?new Date(l.edited).toLocaleString("ko-KR"):""])];
   const csv="\uFEFF"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="우리들의2026_방명록.csv"; a.click();
 };

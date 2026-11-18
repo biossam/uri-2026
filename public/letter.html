@@ -73,6 +73,7 @@ textarea::placeholder{color:#ffffff55}
     <p id="subtitle" class="chalk"></p>
   </header>
 
+  <div id="notice" class="demo" hidden></div>
   <div id="form">
     <div class="lbl chalk"><span>① 분필 색 고르기</span></div>
     <div class="dots" id="dots"></div>
@@ -86,7 +87,7 @@ textarea::placeholder{color:#ffffff55}
     <div class="lbl chalk"><span>③ 사진 붙이기 (선택)</span></div>
     <label id="photoLbl"><span class="ic">📷</span><span><b>사진을 자석으로 붙여요</b><small>함께 찍은 사진이나 오늘 만든 작품</small></span>
       <input id="photoInput" type="file" accept="image/*" hidden></label>
-    <div id="photoPrev"><div class="pol"><img id="prevImg" alt="미리보기"><button id="photoDel" type="button">✕</button></div><small>글 옆에 붙어요</small></div>
+    <div id="photoPrev"><div class="pol"><img id="prevImg" alt="미리보기"><button id="photoDel" type="button">✕</button></div><small>글 옆에 붙어요 · 사진이 있는 글은 선생님이 확인한 뒤 칠판에 써져요</small></div>
 
     <button id="send">칠판에 쓰기 ✎</button>
     <div id="err"></div>
@@ -94,10 +95,11 @@ textarea::placeholder{color:#ffffff55}
 
   <div id="done">
     <span style="font-size:44px">🎉</span>
-    <h2 class="chalk">칠판에 썼어요!</h2>
-    <p class="chalk">앞 화면을 봐 주세요 👀</p>
+    <h2 class="chalk" id="doneTitle">칠판에 썼어요!</h2>
+    <p class="chalk" id="doneSub">앞 화면을 봐 주세요 👀</p>
     <div id="doneNote" class="chalk"><div id="doneText"></div><div id="doneName"></div></div>
-    <button id="again">하나 더 쓰기</button>
+    <button id="again">내 글 고치기 ✎</button>
+    <p style="font-size:12px;color:#ffffff99;margin-top:12px">한 사람이 글 1개만 남길 수 있어요. 고치기는 언제든 할 수 있어요.</p>
   </div>
 </div>
 <div id="tray"><i style="left:14%;width:46px;background:#fbf8ee"></i><i style="left:28%;width:30px;background:#ffb3c7;transform:rotate(-5deg)"></i><i style="left:70%;width:38px;background:#a8dcff"></i></div>
@@ -117,27 +119,42 @@ paint();
 const count=()=>{ const l=ta.value.length; cnt.textContent=`${l} / ${MAX}`; cnt.classList.toggle("warn",l>=MAX-5); };
 ta.addEventListener("input",count); count();
 
-let photo=null;
+let photo=null, hadPhoto=false, editing=false;
 function compress(file,max,q){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>=h&&w>max){h=h*max/w;w=max;} else if(h>max){w=w*max/h;h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=e.target.result; }; r.readAsDataURL(file); }); }
 $("#photoInput").addEventListener("change",async e=>{ const f=e.target.files[0]; if(!f) return;
-  try{ photo=await compress(f,500,.65); $("#prevImg").src=photo; $("#photoPrev").style.display="block"; $("#photoLbl").style.display="none"; }catch(x){ err.textContent="사진을 읽지 못했어요"; } });
-function clearPhoto(){ photo=null; $("#photoInput").value=""; $("#photoPrev").style.display="none"; $("#photoLbl").style.display="flex"; }
+  try{ photo=await compress(f,500,.65); if(photo.length>200000) photo=await compress(f,360,.6); showPhoto(photo); }catch(x){ err.textContent="사진을 읽지 못했어요"; } });
+function clearPhoto(){ photo=null; hadPhoto=false; $("#photoInput").value=""; $("#photoPrev").style.display="none"; $("#photoLbl").style.display="flex"; }
 $("#photoDel").onclick=clearPhoto;
 
+function setEditing(on){ editing=on; $("#send").textContent=on?"고쳐 쓰기 ✎":"칠판에 쓰기 ✎";
+  const n=$("#notice"); if(on){ n.hidden=false; n.textContent="이미 남긴 글이 있어요. 한 사람에 1개라서, 고쳐 쓰기만 할 수 있어요 ✎"; } }
+function showPhoto(src){ $("#prevImg").src=src; $("#photoPrev").style.display="block"; $("#photoLbl").style.display="none"; }
+fetch("/api/mine").then(r=>r.json()).then(j=>{
+  if(j.revoked){ $("#form").innerHTML='<p style="text-align:center;font-family:Gaegu;font-size:22px;margin:30px 0">선생님이 이 기기의 글을 지웠어요.<br>궁금한 점은 선생님께 여쭤 보세요.</p>'; return; }
+  const m=j.mine; if(!m) return;
+  ta.value=m.text; nameEl.value=m.name==="익명"?"":m.name; if(Number.isInteger(m.color)){ color=m.color; paint(); } count();
+  if(m.photo){ hadPhoto=true; showPhoto(m.photo); }
+  setEditing(true);
+  if(m.hold) $("#notice").textContent+=" (지금은 선생님 확인을 기다리는 중이에요)";
+  if(m.hidden) $("#notice").textContent+=" (선생님이 잠시 숨겨 둔 글이에요)";
+}).catch(()=>{});
 $("#send").addEventListener("click",async()=>{
   const text=ta.value.trim(), name=nameEl.value.trim()||"익명";
   if(!text){ err.textContent="한 마디를 써 주세요 ✎"; ta.focus(); return; }
   err.textContent=""; $("#send").disabled=true; $("#send").textContent="쓰는 중…";
   try{
-    const r=await fetch("/api/letters",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,text:text.slice(0,MAX),color,photo})});
+    const r=await fetch("/api/letters",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,text:text.slice(0,MAX),color,photo:(hadPhoto&&!photo)?"keep":photo})});
     const j=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.error||"보내지 못했어요");
     $("#doneText").textContent=text; $("#doneName").textContent="— "+name;
+    $("#doneTitle").textContent=j.edited?"고쳐 썼어요!":"칠판에 썼어요!";
+    $("#doneSub").textContent=j.hidden?"선생님이 잠시 숨겨 둔 글이에요":j.pending?"선생님이 확인한 뒤 칠판에 써져요 ✋":"앞 화면을 봐 주세요 👀";
+    if(photo){ hadPhoto=true; photo=null; } setEditing(true);
     $("#form").style.display="none"; $("#done").style.display="block"; scrollTo(0,0);
   }catch(e){ console.error(e); err.textContent=(e.message&&e.message!=="Failed to fetch")?e.message:"보내지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요."; }
-  $("#send").disabled=false; $("#send").textContent="칠판에 쓰기 ✎";
+  $("#send").disabled=false; $("#send").textContent=editing?"고쳐 쓰기 ✎":"칠판에 쓰기 ✎";
 });
-$("#again").onclick=()=>{ ta.value=""; count(); clearPhoto(); color=Math.floor(Math.random()*6); paint(); $("#done").style.display="none"; $("#form").style.display="block"; scrollTo(0,0); };
+$("#again").onclick=()=>{ $("#done").style.display="none"; $("#form").style.display="block"; scrollTo(0,0); };
 </script>
 </body>
 </html>
