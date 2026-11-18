@@ -9,6 +9,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const QRCode = require("./vendor/QRCode");
+const QRErrorCorrectLevel = require("./vendor/QRCode/QRErrorCorrectLevel");
 
 /* ── 설정 (Render 환경변수로 바꿀 수 있어요) ── */
 const PORT = process.env.PORT || 3000;
@@ -19,6 +21,7 @@ const REVIEW_ALL = process.env.REVIEW_ALL === "1";            // 1이면 모든 
 const PHOTO_REVIEW = process.env.PHOTO_REVIEW !== "0";        // 기본: 사진 글은 확인 후 공개
 const PHOTOS = process.env.PHOTOS !== "0";                    // 0이면 사진 받지 않음
 const EXTRA_BANNED = (process.env.BANNED_WORDS || "").split(",").map(s => s.trim()).filter(Boolean);
+const RETAIN_DAYS = process.env.RETAIN_DAYS === undefined ? 3 : +process.env.RETAIN_DAYS; // 쓴 지 며칠 뒤 자동 삭제 (0 = 끄기)
 const MAX_PHOTO = 200 * 1024;                                  // 사진 1장 data URL 최대 길이
 const MAX_SSE = 400;                                           // 앞 화면 동시 연결 한도
 const PUBLIC = path.join(__dirname, "public");
@@ -29,8 +32,13 @@ const IS_PROD = !!process.env.RENDER;
 /* ── 저장 ── */
 // letters: {key, tok(수정 열쇠의 해시), name, text, color, photo, timestamp, edited, hidden, hold}
 //   hidden = 선생님이 숨김 / hold = 확인 대기(욕설 의심·사진)
-let db = { letters: [], revoked: [] };
-try { db = Object.assign(db, JSON.parse(fs.readFileSync(DATA_FILE, "utf8"))); } catch (e) {}
+let db = { letters: [], revoked: [], code: "" };
+try { const d = JSON.parse(fs.readFileSync(DATA_FILE, "utf8")); if (d && Array.isArray(d.letters)) db = Object.assign(db, d); } catch (e) {}
+// 행사 코드: 환경변수 EVENT_CODE가 있으면 그것, 없으면 처음 켤 때 만들어 저장 (헷갈리는 0/O, 1/I/L 뺌)
+function newCode() { const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let c = ""; for (const b of crypto.randomBytes(6)) c += A[b % A.length]; return c; }
+const ENV_CODE = String(process.env.EVENT_CODE || "").trim().toUpperCase();
+if (!ENV_CODE && !db.code) { db.code = newCode(); setTimeout(() => save(), 0); }
+const eventCode = () => ENV_CODE || db.code;
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
@@ -43,6 +51,7 @@ const sha = s => crypto.createHash("sha256").update(String(s)).digest("hex");
 const visible = L => !L.hidden && !L.hold;
 // 확인 대기 이유: 욕설 의심 > 확인 안 된 사진 > (모두 확인 모드) 확인 안 된 글
 function holdFor(L) {
+  if (personalInfo(L.name, L.text) && !L.textOk) return "privacy";
   if (suspicious(L.name, L.text) && !L.textOk) return "words";
   if (L.photo && PHOTO_REVIEW && !L.photoOk) return "photo";
   if (REVIEW_ALL && !L.textOk) return "all";
@@ -83,6 +92,15 @@ function suspicious(...parts) {
   return BANNED.some(w => raw.includes(w.toLowerCase()) || sq.includes(squash(w)));
 }
 
+// 전화번호·주소·이메일처럼 보이는 글 (실수로 개인정보를 쓰는 걸 막기)
+function personalInfo(...parts) {
+  const t = parts.join(" ");
+  return /01[016789][\s.\-)]*\d{3,4}[\s.\-]*\d{4}/.test(t)          // 휴대전화
+    || /\d[\d\s.\-]{8,}\d/.test(t.replace(/20\d\d/g, ""))             // 숫자가 길게 이어짐 (연도 2026 등은 빼고)
+    || /\d+\s*동\s*\d+\s*호/.test(t) || /[가-힣]+(로|길)\s*\d+/.test(t) || /(아파트|빌라|번지)/.test(t)
+    || /[\w.+-]+@[\w-]+\.[\w.]+/.test(t);
+}
+
 /* ── 횟수 제한 ── */
 function clientIp(req) {
   // Render 앞에는 늘 Cloudflare가 있고, CF-Connecting-IP는 Cloudflare가 직접 덮어써서 속일 수 없어요.
@@ -111,13 +129,38 @@ function adminFailed(ip) {
   adminFail.set(ip, a);
 }
 
+const codeFail = makeLimiter(10 * 60 * 1000, 20); // 틀린 행사 코드: 10분에 20번까지
+function codeOk(req, url) {
+  const c = String(req.headers["x-event-code"] || url.searchParams.get("c") || "").trim().toUpperCase();
+  const a = Buffer.from(sha(c)), b = Buffer.from(sha(eventCode()));
+  return crypto.timingSafeEqual(a, b);
+}
+function qrSVG(text) {
+  const qr = new QRCode(-1, QRErrorCorrectLevel.M); qr.addData(text); qr.make();
+  const n = qr.getModuleCount(), m = 2; let d = "";
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c + m} ${r + m}h1v1h-1z`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n + m * 2} ${n + m * 2}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fffdf6"/><path d="${d}" fill="#2f3a33"/></svg>`;
+}
+
+/* ── 자동 삭제: 쓴 지 RETAIN_DAYS일이 지난 글과 사진 ── */
+function sweep() {
+  if (!RETAIN_DAYS) return;
+  const limit = Date.now() - RETAIN_DAYS * 86400000;
+  const old = db.letters.filter(L => L.timestamp < limit);
+  if (!old.length) return;
+  db.letters = db.letters.filter(L => L.timestamp >= limit); save();
+  old.forEach(L => { if (visible(L)) broadcast("remove", { key: L.key }); });
+  console.log(`자동 삭제: ${old.length}개`);
+}
+setInterval(sweep, 10 * 60 * 1000); setTimeout(sweep, 5000);
+
 /* ── 도우미 ── */
 const SEC = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "X-Frame-Options": "DENY",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   ...(IS_PROD ? { "Strict-Transport-Security": "max-age=15552000" } : {}),
 };
 function send(res, code, obj, extra = {}) { res.writeHead(code, { ...SEC, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extra }); res.end(JSON.stringify(obj)); }
@@ -142,7 +185,7 @@ function isAdmin(req) {
   const a = Buffer.from(sha(k)), b = Buffer.from(sha(ADMIN_PW));
   return crypto.timingSafeEqual(a, b);
 }
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".ico": "image/x-icon" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml; charset=utf-8", ".ico": "image/x-icon" };
 function serveStatic(req, res, urlPath) {
   let p; try { p = decodeURIComponent(urlPath); } catch (e) { res.writeHead(400); return res.end(); }
   if (p === "/") p = "/index.html";
@@ -161,6 +204,25 @@ const server = http.createServer(async (req, res) => {
   const p = url.pathname;
   try {
     if (p === "/healthz") return send(res, 200, { ok: true });
+
+    // 화면이 처음 물어보는 기본 정보 (코드 없이)
+    if (p === "/api/info" && req.method === "GET") return send(res, 200, { retainDays: RETAIN_DAYS, photos: PHOTOS, photoReview: PHOTO_REVIEW, reviewAll: REVIEW_ALL, maxChars: MAX_CHARS });
+
+    // 여기부터는 행사 코드가 있어야 해요 (보기·쓰기·QR)
+    if (p === "/api/stream" || p === "/api/mine" || p === "/api/letters" || p === "/api/qr.svg" || p === "/api/join") {
+      const ip = clientIp(req);
+      if (!codeOk(req, url)) {
+        if (!codeFail(ip)) return send(res, 429, { error: "코드를 여러 번 틀렸어요. 10분 뒤에 다시 해 주세요" });
+        return send(res, 403, { error: "행사 코드가 맞지 않아요. 앞 화면의 QR을 다시 찍어 주세요", code: "bad_code" });
+      }
+      if (p === "/api/join") return send(res, 200, { ok: true });
+      if (p === "/api/qr.svg") {
+        const host = String(req.headers.host || "").replace(/[^a-z0-9.:-]/gi, "");
+        const proto = IS_PROD ? "https" : (req.headers["x-forwarded-proto"] === "https" ? "https" : "http");
+        res.writeHead(200, { ...SEC, "Content-Type": "image/svg+xml; charset=utf-8", "Cache-Control": "no-store" });
+        return res.end(qrSVG(`${proto}://${host}/letter.html?c=${eventCode()}`));
+      }
+    }
 
     // 앞 화면 실시간 연결
     if (p === "/api/stream" && req.method === "GET") {
@@ -236,6 +298,7 @@ const server = http.createServer(async (req, res) => {
       adminFail.delete(ip);
       const act = p.slice("/api/admin/".length);
       if (act === "check") return send(res, 200, { ok: true });
+      if (act === "info") return send(res, 200, { code: eventCode(), fromEnv: !!ENV_CODE, retainDays: RETAIN_DAYS });
       if (act === "letters" && req.method === "GET") return send(res, 200, db.letters.map(adminView));
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       const b = await readBody(req, 10 * 1024);
@@ -249,7 +312,7 @@ const server = http.createServer(async (req, res) => {
         save(); if (was) broadcast("remove", { key: L.key }); return send(res, 200, { ok: true });
       }
       if (act === "clear-photos") { db.letters.forEach(x => { x.photo = null; x.hold = holdFor(x); }); save(); broadcast("init", db.letters.filter(visible).map(pub)); return send(res, 200, { ok: true }); }
-      if (act === "reset") { db = { letters: [], revoked: [] }; save(); broadcast("init", []); return send(res, 200, { ok: true }); }
+      if (act === "reset") { db = { letters: [], revoked: [], code: ENV_CODE ? "" : newCode() }; save(); broadcast("init", []); return send(res, 200, { ok: true }); }
       return send(res, 404, { error: "없는 기능이에요" });
     }
 

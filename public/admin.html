@@ -45,6 +45,10 @@ tr.hold td{background:#fffbea}
 #gate input{width:200px;padding:12px;border-radius:10px;border:0;font-size:20px;text-align:center;letter-spacing:.3em}
 #gate button{display:block;width:200px;margin:10px auto 0;padding:11px;border-radius:10px;border:0;background:#ffe98a;font:700 14px "Noto Sans KR";cursor:pointer}
 #gateMsg{min-height:1.4em;color:#ffb4b4;font-size:12px;margin-top:6px}
+.event{display:flex;flex-wrap:wrap;align-items:center;gap:14px;background:#2f4b3c;color:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px}
+.event .k{font-size:12px;opacity:.75;margin-right:8px}.event b{font-family:Jua;font-size:26px;letter-spacing:.15em;color:#ffe98a}
+.event .links{display:flex;gap:8px}.event button{padding:8px 12px;border-radius:9px;border:0;background:#fff;color:#2f4b3c;font:700 13px "Noto Sans KR";cursor:pointer}
+.event .note{flex-basis:100%;font-size:12px;opacity:.8}
 @media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -54,6 +58,11 @@ tr.hold td{background:#fffbea}
 <div class="top">
   <h1>✎ 우리들의 2026 · 방명록 관리<small id="pathInfo"></small></h1>
   <div class="live"><span id="ldot"></span><span id="lstat">연결 중…</span></div>
+</div>
+<div id="event" class="event">
+  <div><span class="k">행사 코드</span><b id="ev-code">—</b></div>
+  <div class="links"><button id="openFront">📺 앞 화면 열기</button><button id="copyLetter">📋 글쓰기 주소 복사</button></div>
+  <div class="note" id="ev-note"></div>
 </div>
 <div class="stats">
   <div><b id="s-total">0</b><span>전체</span></div>
@@ -77,7 +86,7 @@ tr.hold td{background:#fffbea}
 <script>
 const $=s=>document.querySelector(s);
 const esc=t=>String(t??"").replace(/[<>&"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;",'"':"&quot;"}[c]));
-const HOLD={words:"욕설 의심",photo:"사진 확인",all:"확인 대기"};
+const HOLD={privacy:"개인정보 의심",words:"욕설 의심",photo:"사진 확인",all:"확인 대기"};
 const COLORS=["#e8e4d6","#ffe98a","#ffb3c7","#a8dcff","#bff0a6","#ffc89a"];
 let KEY=sessionStorage.getItem("uri2026Admin")||"", all=[], filter="all", timer=null;
 
@@ -92,12 +101,19 @@ async function tryKey(k){
   const r=await fetch("/api/admin/check",{headers:{"x-admin-key":k}});
   if(r.status===429){ const j=await r.json().catch(()=>({})); $("#gateMsg").textContent=j.error; return "locked"; }
   if(!r.ok) return false;
-  KEY=k; sessionStorage.setItem("uri2026Admin",k); $("#gate").style.display="none"; load(); clearInterval(timer); timer=setInterval(load,3000); return true;
+  KEY=k; sessionStorage.setItem("uri2026Admin",k); $("#gate").style.display="none"; loadInfo(); load(); clearInterval(timer); timer=setInterval(load,3000); return true;
 }
 const go=async()=>{ const ok=await tryKey($("#gatePw").value); if(ok===false){ $("#gateMsg").textContent="비밀번호가 틀렸어요 (5번 틀리면 10분 잠겨요)"; } if(ok!==true) $("#gatePw").value=""; };
 $("#gateOk").onclick=go; $("#gatePw").addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
 if(KEY) tryKey(KEY).then(ok=>{ if(ok!==true) lock(); }); else $("#gatePw").focus();
 
+let EV=null;
+async function loadInfo(){
+  try{ EV=await api("info"); $("#ev-code").textContent=EV.code;
+    $("#ev-note").textContent=`코드를 아는 사람만 칠판을 보고 쓸 수 있어요. ${EV.retainDays?`글과 사진은 쓴 날부터 ${EV.retainDays}일 뒤 자동으로 지워져요.`:"자동 삭제가 꺼져 있어요."} ${EV.fromEnv?"":"코드는 '전체 삭제'를 하면 새로 바뀌어요."}`; }catch(e){}
+}
+$("#openFront").onclick=()=>{ if(EV) window.open("/?c="+encodeURIComponent(EV.code),"_blank"); };
+$("#copyLetter").onclick=async()=>{ if(!EV) return; const u=location.origin+"/letter.html?c="+encodeURIComponent(EV.code); try{ await navigator.clipboard.writeText(u); $("#copyLetter").textContent="✅ 복사됨"; setTimeout(()=>$("#copyLetter").textContent="📋 글쓰기 주소 복사",1500);}catch(e){ prompt("글쓰기 주소",u); } };
 async function load(){
   try{ all=(await api("letters")).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
     $("#ldot").classList.add("on"); $("#lstat").textContent="연결됨 · 3초마다 새로 고침"; stats(); render(); }
@@ -145,7 +161,7 @@ $("#csv").onclick=()=>{
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="우리들의2026_방명록.csv"; a.click();
 };
 $("#delPhotos").onclick=()=>confirmBox("사진을 모두 지울까요?","글은 남고 사진만 지워져요.\n되돌릴 수 없어요.",async()=>{ await api("clear-photos",{}); load(); });
-$("#reset").onclick=()=>confirmBox("🧹 전체 삭제할까요?",`글 ${all.length}개가 모두 지워져요.\n되돌릴 수 없어요.\n(먼저 CSV로 받아 두세요)`,async()=>{ await api("reset",{}); load(); });
+$("#reset").onclick=()=>confirmBox("🧹 전체 삭제할까요?",`글 ${all.length}개가 모두 지워져요.\n되돌릴 수 없어요.\n(먼저 CSV로 받아 두세요)\n\n행사 코드도 새로 바뀌어서, 앞 화면을 '앞 화면 열기'로 다시 열어야 해요.`,async()=>{ await api("reset",{}); loadInfo(); load(); });
 $("#pathInfo").textContent="숨김 / 삭제 / CSV · 행사가 끝나면 꼭 CSV로 받아 두세요";
 </script>
 </body>
