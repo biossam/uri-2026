@@ -71,7 +71,9 @@ db.event = cleanEvent(db.event || {}, freshEvent());
 function newCode() { const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let c = ""; for (const b of crypto.randomBytes(6)) c += A[b % A.length]; return c; }
 const ENV_CODE = String(process.env.EVENT_CODE || "").trim().toUpperCase();
 if (!ENV_CODE && !db.code) { db.code = newCode(); setTimeout(() => save(), 0); }
-const eventCode = () => ENV_CODE || db.code;
+// 관리자 화면에서 코드를 바꾸면(db.codeSet) 환경변수 EVENT_CODE보다 그 코드가 먼저예요
+const eventCode = () => (db.codeSet && db.code) || ENV_CODE || db.code;
+const CODE_RE = /^[A-Z0-9]{4,12}$/;
 let saveTimer = null;
 function save() {
   clearTimeout(saveTimer);
@@ -356,7 +358,7 @@ const server = http.createServer(async (req, res) => {
       if (!sessionOk(req)) return send(res, 401, { error: "다시 로그인해 주세요" });
       const act = p.slice("/api/admin/".length);
       if (act === "check") return send(res, 200, { ok: true });
-      if (act === "info") return send(res, 200, { event: db.event, presets: PRESETS, themes: THEMES, photosEnv: PHOTOS, code: eventCode(), fromEnv: !!ENV_CODE, retainDays: RETAIN_DAYS, closed: !!db.closed, viewers: clients.size, weak: WEAK_PW });
+      if (act === "info") return send(res, 200, { event: db.event, presets: PRESETS, themes: THEMES, photosEnv: PHOTOS, code: eventCode(), fromEnv: !!ENV_CODE && !db.codeSet, retainDays: RETAIN_DAYS, closed: !!db.closed, viewers: clients.size, weak: WEAK_PW });
       if (act === "letters" && req.method === "GET") return send(res, 200, db.letters.map(adminView));
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       const b = await readBody(req, 10 * 1024);
@@ -368,8 +370,12 @@ const server = http.createServer(async (req, res) => {
       }
       if (act === "close") { db.closed = !!b.closed; save(); if (db.closed) dropAll(); return send(res, 200, { ok: true, closed: db.closed }); }
       if (act === "rotate-code") {
-        if (ENV_CODE) return send(res, 400, { error: "코드를 Render 환경변수 EVENT_CODE로 정해 두셨어요. Render에서 바꿔 주세요." });
-        db.code = newCode(); save(); dropAll(); return send(res, 200, { ok: true, code: db.code });
+        // 직접 정한 코드(영문 대문자·숫자 4~12자) 또는 빈칸이면 무작위 코드
+        let c = String(b.code || "").trim().toUpperCase();
+        if (c && !CODE_RE.test(c)) return send(res, 400, { error: "코드는 영어와 숫자로 4~12자만 쓸 수 있어요" });
+        if (!c) c = newCode();
+        if (c === eventCode()) return send(res, 400, { error: "지금 코드와 같아요" });
+        db.code = c; db.codeSet = true; save(); dropAll(); return send(res, 200, { ok: true, code: db.code });
       }
       const L = typeof b.key === "string" ? db.letters.find(x => x.key === b.key) : null;
       if (act === "show" && L) { const was = visible(L); L.hidden = false; L.hold = ""; L.textOk = true; L.photoOk = true; save(); announce(L, was); return send(res, 200, { ok: true }); }
@@ -381,7 +387,7 @@ const server = http.createServer(async (req, res) => {
         save(); if (was) broadcast("remove", { key: L.key }); return send(res, 200, { ok: true });
       }
       if (act === "clear-photos") { db.letters.forEach(x => { x.photo = null; x.hold = holdFor(x); }); save(); broadcast("init", db.letters.filter(visible).map(pub)); return send(res, 200, { ok: true }); }
-      if (act === "reset") { db = { letters: [], revoked: [], code: ENV_CODE ? "" : newCode(), closed: false, event: db.event }; save(); dropAll(); return send(res, 200, { ok: true }); }
+      if (act === "reset") { const keepEnv = ENV_CODE && !db.codeSet; db = { letters: [], revoked: [], code: keepEnv ? "" : newCode(), codeSet: !keepEnv && !!ENV_CODE, closed: false, event: db.event }; save(); dropAll(); return send(res, 200, { ok: true }); }
       return send(res, 404, { error: "없는 기능이에요" });
     }
 

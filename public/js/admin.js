@@ -50,20 +50,44 @@ $("#evSave").onclick=async()=>{
 $("#evPreview").onclick=()=>window.open("/?demo","_blank");
 async function loadInfo(){
   try{ EV=await api("info"); showEvent(); $("#ev-code").textContent=EV.code;
-    $("#ev-note").textContent=`코드를 아는 사람만 칠판을 보고 쓸 수 있어요 · 지금 앞 화면 ${EV.viewers}개 연결 · ${EV.retainDays?`글과 사진은 쓴 날부터 ${EV.retainDays}일 뒤 자동 삭제`:"자동 삭제 꺼짐"}${EV.fromEnv?" · 코드는 Render의 EVENT_CODE":""}`;
+    $("#ev-note").textContent=`코드를 아는 사람만 칠판을 보고 쓸 수 있어요 · 지금 앞 화면 ${EV.viewers}개 연결 · ${EV.retainDays?`글과 사진은 쓴 날부터 ${EV.retainDays}일 뒤 자동 삭제`:"자동 삭제 꺼짐"}${EV.fromEnv?" · 지금 코드는 서버 설정(EVENT_CODE)이에요. 🔑 코드 바꾸기로 바꾸면 그 코드가 먼저 쓰여요":""}`;
     $("#closeBoard").textContent=EV.closed?"🔓 방명록 다시 열기":"🔒 방명록 닫기";
     $("#closedBanner").hidden=!EV.closed;
-    $("#rotate").hidden=EV.fromEnv;
+    const u=location.origin+"/letter.html?c="+encodeURIComponent(EV.code);
+    if($("#letterUrl").value!==u){ $("#letterUrl").value=u; $("#qrSave").href="/api/qr.svg?c="+encodeURIComponent(EV.code); $("#qrSave").download="QR_"+fname()+".svg"; }
     $("#weakBanner").hidden=!EV.weak;
   }catch(e){}
 }
 $("#closeBoard").onclick=()=>{ if(!EV) return;
   if(EV.closed) return api("close",{closed:false}).then(loadInfo);
   confirmBox("🔒 방명록을 닫을까요?","앞 화면이 꺼지고, 아무도 보거나 쓸 수 없어요.\n글은 그대로 남고, 다시 열 수 있어요.\n행사가 끝나면 닫아 두세요.",()=>api("close",{closed:true}).then(loadInfo),"닫기"); };
-$("#rotate").onclick=()=>confirmBox("🔑 행사 코드를 바꿀까요?","코드가 밖으로 퍼졌을 때 써요.\n지금 켜진 앞 화면과 인쇄한 QR은 더 이상 안 돼요.\n바꾼 뒤 '앞 화면 열기'로 다시 띄워 주세요.",()=>api("rotate-code",{}).then(loadInfo),"바꾸기");
+$("#rotate").onclick=()=>{ $("#newCode").value=""; $("#codeErr").textContent=""; $("#codeBox").style.display="flex"; $("#newCode").focus(); };
+$("#codeNo").onclick=()=>$("#codeBox").style.display="none";
+const doCode=async()=>{
+  const c=$("#newCode").value.trim().toUpperCase();
+  if(c&&!/^[A-Z0-9]{4,12}$/.test(c)){ $("#codeErr").textContent="영어와 숫자로 4~12자만 쓸 수 있어요"; return; }
+  const r=await fetch("/api/admin/rotate-code",{method:"POST",headers:{"x-admin-session":SES,"Content-Type":"application/json"},body:JSON.stringify({code:c})}).catch(()=>null);
+  if(r&&r.status===401){ $("#codeBox").style.display="none"; return lock("다시 로그인해 주세요"); }
+  const j=r?await r.json().catch(()=>({})):{};
+  if(!r||!r.ok){ $("#codeErr").textContent=j.error||"바꾸지 못했어요"; return; }
+  $("#codeBox").style.display="none"; await loadInfo();
+  $("#copyMsg").textContent=`✅ 새 코드 ${j.code} · '📺 앞 화면 열기'로 다시 띄워 주세요`;
+};
+$("#codeOk").onclick=doCode; $("#newCode").addEventListener("keydown",e=>{ if(e.key==="Enter") doCode(); });
 $("#logout").onclick=async()=>{ try{ await api("logout",{}); }catch(e){} lock("로그아웃했어요"); };
 $("#openFront").onclick=()=>{ if(EV) window.open("/?c="+encodeURIComponent(EV.code),"_blank"); };
-$("#copyLetter").onclick=async()=>{ if(!EV) return; const u=location.origin+"/letter.html?c="+encodeURIComponent(EV.code); try{ await navigator.clipboard.writeText(u); $("#copyLetter").textContent="✅ 복사됨"; setTimeout(()=>$("#copyLetter").textContent="📋 글쓰기 주소 복사",1500);}catch(e){ prompt("글쓰기 주소",u); } };
+// 주소 복사: 클립보드가 막힌 브라우저에서도 되게 (안 되면 주소 칸을 선택해 둬요)
+async function copyAddr(btn,label){
+  if(!EV) return; const box=$("#letterUrl"), u=box.value; let ok=false;
+  try{ await navigator.clipboard.writeText(u); ok=true; }catch(e){}
+  if(!ok){ box.focus(); box.select(); try{ ok=document.execCommand("copy"); }catch(e){} }
+  btn.textContent=ok?"✅ 복사됨":"⌨️ Ctrl+C 를 눌러 주세요"; $("#copyMsg").textContent=ok?"글쓰기 주소를 복사했어요. 카톡·하이클래스에 붙여 넣으면 돼요":"";
+  if(!ok){ box.focus(); box.select(); }
+  setTimeout(()=>btn.textContent=label,2000);
+}
+$("#copyLetter").onclick=()=>copyAddr($("#copyLetter"),"📋 글쓰기 주소 복사");
+$("#copyLetter2").onclick=()=>copyAddr($("#copyLetter2"),"📋 복사");
+$("#letterUrl").onclick=e=>e.target.select();
 async function load(){
   try{ all=(await api("letters")).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
     $("#ldot").classList.add("on"); $("#lstat").textContent="연결됨 · 3초마다 새로 고침"; stats(); render(); }
