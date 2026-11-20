@@ -88,6 +88,23 @@ $("#csv").onclick=()=>{
   const csv="\uFEFF"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="우리들의2026_방명록.csv"; a.click();
 };
+// 사진까지 담긴 기념 파일(HTML 한 장) — 인터넷 없이도 열리고, 브라우저에서 인쇄하면 PDF로도 남길 수 있어요
+$("#keep").onclick=()=>{
+  const list=all.filter(l=>!l.hidden).slice().sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
+  if(!list.length) return alert("남길 글이 아직 없어요");
+  const img=p=>typeof p==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(p)?`<img src="${p}" alt="">`:"";
+  const cards=list.map(l=>`<div class="c" style="background:${COLORS[l.color]??"#fffdf6"}">${img(l.photo)}<p>${esc(l.text).replace(/\n/g,"<br>")}</p><b>${esc(l.name)}</b><i>${new Date(l.timestamp||0).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</i></div>`).join("");
+  const html=`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>우리들의 2026 · 방명록</title><style>
+*{box-sizing:border-box;margin:0}body{font-family:"Noto Sans KR",sans-serif;background:#2f4b3c;color:#2b332e;padding:28px}
+h1{color:#fffdf6;text-align:center;font-size:30px}h1+p{color:#ffe98a;text-align:center;margin:6px 0 22px}
+.w{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;align-items:start}
+.c{border-radius:14px;padding:14px;box-shadow:0 3px 10px #0003;break-inside:avoid}
+.c img{width:100%;border-radius:10px;margin-bottom:8px}.c p{font-size:16px;line-height:1.5;word-break:keep-all}
+.c b{display:block;margin-top:8px}.c i{font-size:11px;color:#6b6b6b;font-style:normal}
+@media print{body{background:#fff}h1{color:#2f4b3c}h1+p{color:#4b6b58}}
+</style></head><body><h1>✎ 우리들의 2026</h1><p>마음 ${list.length}개 · ${new Date().toLocaleDateString("ko-KR")} 저장</p><div class="w">${cards}</div></body></html>`;
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([html],{type:"text/html"})); a.download="우리들의2026_방명록_기념.html"; a.click();
+};
 $("#delPhotos").onclick=()=>confirmBox("사진을 모두 지울까요?","글은 남고 사진만 지워져요.\n되돌릴 수 없어요.",async()=>{ await api("clear-photos",{}); load(); },"사진 삭제");
 $("#reset").onclick=()=>confirmBox("🧹 전체 삭제할까요?",`글 ${all.length}개가 모두 지워져요.\n되돌릴 수 없어요.\n(먼저 CSV로 받아 두세요)\n\n행사 코드도 새로 바뀌고 앞 화면이 꺼져요. '앞 화면 열기'로 다시 띄워 주세요.`,async()=>{ await api("reset",{}); loadInfo(); load(); },"모두 삭제");
-$("#pathInfo").textContent="숨김 / 삭제 / CSV · 행사가 끝나면 꼭 CSV로 받아 두세요";
+$("#pathInfo").textContent="숨김 / 삭제 / 저장 · 행사가 끝나면 꼭 CSV와 기념 파일로 받아 두세요";
