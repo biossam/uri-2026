@@ -28,7 +28,7 @@ const MAX_PHOTO = 200 * 1024;                                  // 사진 1장 da
 const MAX_SSE = 400;                                           // 앞 화면 동시 연결 한도
 const MAX_SSE_PER_IP = 8;                                      // 한 곳(IP)에서 여는 앞 화면 수 한도
 const PUBLIC = path.join(__dirname, "public");
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");   // onpod: /workspace/data (영구 디스크)
 const DATA_FILE = path.join(DATA_DIR, "letters.json");
 const IS_PROD = !!process.env.RENDER || process.env.NODE_ENV === "production";   // Render·onpod(Dockerfile) 실제 서버
 
