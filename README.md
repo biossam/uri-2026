@@ -1,3 +1,6 @@
+> **이 저장소는 보관(Archive)됐어요.** 칠판 방명록은 이제 [`biossam/graduation-village`](https://github.com/biossam/graduation-village)의 `guestbook` 폴더에서 관리하고,
+> https://graduation-village.onpod.ai/guestbook/ 에서 돌아가요. (2026-11-21 옮김)
+
 # 우리들의 2026 ✎
 
 칠판에 분필로 쓰듯 실시간으로 글이 나타나는 하루 행사용 방명록이에요.
