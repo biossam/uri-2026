@@ -33,7 +33,7 @@ $("#titleBox").addEventListener("click",()=>window.open("admin.html","_blank"));
 let CODE=(Q.get("c")||"").trim().toUpperCase();
 function drawQR(){
   const base=location.origin+"/letter.html";
-  $("#qrurl").textContent=base.replace(/^https?:\/\//,"")+"  ·  코드 "+CODE;
+  $("#qrurl").textContent=base.replace(/^https?:\/\//,"");   // 코드는 QR 안에만 (글자로는 안 보여요)
   $("#qrCard").href=base+"?c="+encodeURIComponent(CODE);
   $("#qrcode").innerHTML=`<img alt="글쓰기 QR" src="/api/qr.svg?c=${encodeURIComponent(CODE)}">`;
 }
