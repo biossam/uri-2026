@@ -107,7 +107,8 @@ function personalInfo(...parts) {
 
 /* ── 횟수 제한 ── */
 function clientIp(req) {
-  // Render 앞에는 늘 Cloudflare가 있고, CF-Connecting-IP는 Cloudflare가 직접 덮어써서 속일 수 없어요.
+  // Render·onpod 앞에는 늘 Cloudflare가 있고, CF-Connecting-IP는 Cloudflare가 직접 채워요.
+  // (손님이 이 칸을 꾸며 보내면 Cloudflare가 아예 막아요 — onpod에서 2026-11-20 확인)
   // (X-Forwarded-For는 Render가 뒤에 덧붙이기만 해서 앞부분은 누구나 꾸며 넣을 수 있어요)
   const t = String(req.headers["cf-connecting-ip"] || req.headers["true-client-ip"] || "").trim();
   if (t) return t;
@@ -222,7 +223,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/info" && req.method === "GET") return send(res, 200, { closed: !!db.closed, retainDays: RETAIN_DAYS, photos: PHOTOS, photoReview: PHOTO_REVIEW, reviewAll: REVIEW_ALL, maxChars: MAX_CHARS });
 
     // 여기부터는 행사 코드가 있어야 해요 (보기·쓰기·QR)
-    if (p === "/api/stream" || p === "/api/mine" || p === "/api/letters" || p === "/api/qr.svg" || p === "/api/join" || p === "/api/forget" || p === "/api/ipcheck") {
+    if (p === "/api/stream" || p === "/api/mine" || p === "/api/letters" || p === "/api/qr.svg" || p === "/api/join" || p === "/api/forget") {
       const ip = clientIp(req);
       if (!codeOk(req, url)) {
         if (!codeFail(ip)) return send(res, 429, { error: "코드를 여러 번 틀렸어요. 10분 뒤에 다시 해 주세요" });
@@ -230,11 +231,6 @@ const server = http.createServer(async (req, res) => {
       }
       if (db.closed && p !== "/api/forget") return send(res, 403, { error: "방명록이 닫혔어요. 참여해 줘서 고마워요!", code: "closed" });
       if (p === "/api/join") return send(res, 200, { ok: true });
-      // (임시 점검) 서버가 받은 '접속 주소' 관련 칸 — 요청한 사람 자신의 값만 돌려줘요
-      if (p === "/api/ipcheck") {
-        const pick = {}; for (const k of Object.keys(req.headers)) if (/ip|forward|real|client|cf-|via|x-envoy|fly|onpod/i.test(k)) pick[k] = String(req.headers[k]).slice(0, 200);
-        return send(res, 200, { socket: req.socket.remoteAddress, headers: pick, used: clientIp(req) });
-      }
       // 공용 기기: 이 기기와 내 글의 연결 끊기 (글은 그대로 남고, 다음 친구가 새로 쓸 수 있어요)
       if (p === "/api/forget" && req.method === "POST") return send(res, 200, { ok: true }, { "Set-Cookie": `uri_tok=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${IS_PROD ? "; Secure" : ""}` });
       if (p === "/api/qr.svg") {
