@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>방명록 관리</title>
+<title>칠판 방명록 관리</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -73,7 +73,7 @@ tr.hold td{background:#fffbea}
 <div id="gate"><div class="box"><b>🔐 관리자</b><input id="gatePw" type="password" maxlength="64" autocomplete="current-password"><div id="gateMsg"></div><button id="gateOk">열기</button></div></div>
 
 <div class="top">
-  <h1>✎ 우리들의 2026 · 방명록 관리<small id="pathInfo"></small></h1>
+  <h1>✎ 칠판 방명록 관리<small id="pathInfo"></small></h1>
   <div class="live"><span id="ldot"></span><span id="lstat">연결 중…</span></div>
 </div>
 <div id="weakBanner" class="banner warn" hidden>⚠️ 관리자 비밀번호가 너무 쉬워요. 서버 환경변수 ADMIN_PW를 8자 이상(글자+숫자)으로 바꿔 주세요.</div>
@@ -93,7 +93,7 @@ tr.hold td{background:#fffbea}
     <label>글쓰기 화면 안내<input id="f-writeSub" maxlength="40"></label>
     <label>질문 (글쓰기 칸 위에 나와요)<input id="f-prompt" maxlength="50" placeholder="비우면 '한 마디 쓰기'"></label>
     <label>추가 칸 이름 (예: 소속, 학년)<input id="f-extraLabel" maxlength="8" placeholder="비우면 추가 칸 없음"></label>
-    <label>테마<select id="f-theme"><option value="chalk">🎓 초록 칠판</option><option value="sakura">🌸 벚꽃</option><option value="calm">📖 차분한 파랑</option><option value="festa">🎉 축제</option></select></label>
+    <label>테마<select id="f-theme"><option value="chalk">🎓 초록 칠판</option><option value="sakura">🌸 벚꽃</option><option value="calm">📖 차분한 파랑</option><option value="festa">🎉 축제</option><option value="sunset">🌇 노을</option><option value="sky">☁️ 하늘</option><option value="birthday">🎂 생일 파티</option></select></label>
   </div>
   <div class="toggles">
     <label><input type="checkbox" id="f-askName">이름 받기</label>

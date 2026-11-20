@@ -34,11 +34,16 @@ const IS_PROD = !!process.env.RENDER || process.env.NODE_ENV === "production";  
 
 /* ── 행사 종류 ── */
 // 행사마다 제목·문구·테마·질문·추가 칸·이름/사진 받기를 바꿔요. 한 번에 행사 하나만 열어요.
-const THEMES = ["chalk", "sakura", "calm", "festa"];
+const THEMES = ["chalk", "sakura", "calm", "festa", "sunset", "sky", "birthday"];
 const PRESETS = {
-  graduation: { label: "🎓 졸업식", title: "우리들의 2026", subtitle: "졸업을 축하해요, 우리들의 마음을 남겨요", writeTitle: "졸업 축하 한 마디", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "졸업하는 친구, 선생님께 하고 싶은 말", extraLabel: "", askName: true, photos: true, theme: "chalk" },
+  graduation: { label: "🎓 졸업식", title: "졸업을 축하해요", subtitle: "우리들의 2026, 마음을 남겨요", writeTitle: "졸업 축하 한 마디", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "졸업하는 친구, 선생님께 하고 싶은 말", extraLabel: "", askName: true, photos: true, theme: "chalk" },
   entrance:   { label: "🌸 입학식", title: "입학을 축하해요", subtitle: "새 친구들을 환영해요", writeTitle: "입학 축하 한 마디", writeSub: "새 친구에게 따뜻한 말을 건네요", prompt: "새 친구에게 해 주고 싶은 말", extraLabel: "", askName: true, photos: true, theme: "sakura" },
   openclass:  { label: "📖 수업 공개", title: "오늘의 수업", subtitle: "함께해 주셔서 감사합니다", writeTitle: "수업 소감 남기기", writeSub: "이름 없이 편하게 남겨 주세요", prompt: "오늘 수업에서 좋았던 점이나 궁금한 점", extraLabel: "", askName: false, photos: false, theme: "calm" },
+  farewell:   { label: "🌇 송별회", title: "고마웠어요", subtitle: "함께한 시간을 오래 기억할게요", writeTitle: "송별 인사 남기기", writeSub: "떠나는 분께 마음을 전해요", prompt: "떠나는 분께 전하고 싶은 말", extraLabel: "", askName: true, photos: true, theme: "sunset" },
+  welcome:    { label: "👋 환영회", title: "환영합니다", subtitle: "새로운 만남을 반겨요", writeTitle: "환영 인사 남기기", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "새로 오신 분께 건네는 첫인사", extraLabel: "", askName: true, photos: true, theme: "sky" },
+  birthday:   { label: "🎂 생일", title: "생일 축하해요", subtitle: "오늘의 주인공에게 마음을 전해요", writeTitle: "생일 축하 한 마디", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "생일 주인공에게 하고 싶은 말", extraLabel: "", askName: true, photos: true, theme: "birthday" },
+  recital:    { label: "🎭 학예회", title: "우리들의 무대", subtitle: "멋진 무대에 박수를 보내요", writeTitle: "학예회 응원 남기기", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "가장 기억에 남는 무대와 응원 한 마디", extraLabel: "", askName: true, photos: true, theme: "festa" },
+  thanks:     { label: "💌 스승의 날", title: "고맙습니다, 선생님", subtitle: "마음을 담아 전해요", writeTitle: "감사 편지 쓰기", writeSub: "선생님께 마음을 전해요", prompt: "선생님께 드리고 싶은 말", extraLabel: "", askName: true, photos: false, theme: "sakura" },
   festa:      { label: "🎉 연구회 페스타", title: "연구회 페스타", subtitle: "오늘의 배움과 만남을 남겨요", writeTitle: "페스타 방명록", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "오늘 페스타에서 기억에 남는 것", extraLabel: "소속", askName: true, photos: true, theme: "festa" },
 };
 function cleanEvent(b, base) {

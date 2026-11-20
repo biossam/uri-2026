@@ -25,6 +25,33 @@ html[data-theme="festa"] #tray{background:linear-gradient(#f7b267,#e07a3f)}
 html[data-theme="festa"] #pager{color:#34305f;text-shadow:0 0 .4cqh #fff}
 html[data-theme="festa"] #qrCard h3{color:#34305f}
 
+/* 🌇 노을 (송별회) */
+html[data-theme="sunset"]{--board:#553a46;--c1:#ffd59e;--c3:#ffc2b3}
+html[data-theme="sunset"] #stage,html[data-theme="sunset"] body.write{background:linear-gradient(180deg,#ffd29e,#f4a27f 55%,#d97a6c)}
+html[data-theme="sunset"] #stage::before{display:none}
+html[data-theme="sunset"] #tray{background:linear-gradient(#f0a07c,#c96c5f)}
+html[data-theme="sunset"] #pager{color:#553a46}
+html[data-theme="sunset"] #qrCard h3{color:#553a46}
+
+/* ☁️ 하늘 (환영회) */
+html[data-theme="sky"]{--board:#2d5870;--c1:#fff1a8;--c3:#c9f0ff}
+html[data-theme="sky"] #stage,html[data-theme="sky"] body.write{background:
+  radial-gradient(18% 9% at 14% 22%,#fff 60%,#fff0 62%),radial-gradient(14% 7% at 84% 78%,#fff 60%,#fff0 62%),
+  linear-gradient(180deg,#d3eefc,#a6d6f0 60%,#82bfe0)}
+html[data-theme="sky"] #stage::before{display:none}
+html[data-theme="sky"] #tray{background:linear-gradient(#9ccbe6,#6fa9cc)}
+html[data-theme="sky"] #pager{color:#2d5870}
+html[data-theme="sky"] #qrCard h3{color:#2d5870}
+
+/* 🎂 생일 파티 */
+html[data-theme="birthday"]{--board:#4a3a6c;--c1:#ffe17a;--c3:#ffc6e0}
+html[data-theme="birthday"] #stage,html[data-theme="birthday"] body.write{background:
+  radial-gradient(circle,#ffffffaa 18%,#fff0 20%) 0 0/26px 26px,linear-gradient(180deg,#ffd6e6,#ffb6cf 60%,#f59bbc)}
+html[data-theme="birthday"] #stage::before{display:none}
+html[data-theme="birthday"] #tray{background:linear-gradient(#f9a8c6,#e07aa3)}
+html[data-theme="birthday"] #pager{color:#4a3a6c}
+html[data-theme="birthday"] #qrCard h3{color:#4a3a6c}
+
 /* 테마 꾸밈 (이모지) */
 #deco{position:absolute;inset:0;pointer-events:none;z-index:1}
 #deco span{position:absolute;font-size:4cqh;opacity:.85;filter:drop-shadow(0 .3cqh .4cqh #0005)}
