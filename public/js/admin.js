@@ -25,9 +25,31 @@ const go=async()=>{
 $("#gateOk").onclick=go; $("#gatePw").addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
 if(SES) fetch("/api/admin/check",{headers:{"x-admin-session":SES}}).then(r=>r.ok?enter():lock()).catch(()=>lock()); else $("#gatePw").focus();
 
-let EV=null;
+let EV=null, evFilled=false, evPreset="";
+const F=["title","subtitle","writeTitle","writeSub","prompt","extraLabel","theme"];
+function fillEvent(e,preset){
+  evPreset=preset; F.forEach(k=>$("#f-"+k).value=e[k]??""); $("#f-askName").checked=e.askName!==false; $("#f-photos").checked=e.photos!==false;
+  document.querySelectorAll("#presets button").forEach(b=>b.classList.toggle("on",b.dataset.p===preset));
+}
+function evWarn(){ const w=$("#evWarn"); const n=all.length; w.hidden=!(n&&EV&&evPreset&&evPreset!=="custom"&&evPreset!==EV.event.preset); w.textContent=`지금 칠판에 글 ${n}개가 있어요. 새 행사라면 먼저 CSV·기념 파일로 받은 뒤 '🧹 전체 삭제'를 하고 저장하세요.`; }
+function showEvent(){
+  if(!EV||!EV.event) return; const e=EV.event, P=EV.presets||{};
+  $("#evNow").textContent="지금: "+((P[e.preset]&&P[e.preset].label)||"✏️ 직접 만들기")+" · "+e.title;
+  if(!$("#presets").children.length){
+    $("#presets").innerHTML=Object.entries(P).map(([k,v])=>`<button type="button" data-p="${esc(k)}">${esc(v.label)}</button>`).join("")+`<button type="button" data-p="custom">✏️ 직접 만들기</button>`;
+    $("#presets").onclick=ev=>{ const b=ev.target.closest("button[data-p]"); if(!b) return; const k=b.dataset.p;
+      fillEvent(k==="custom"?Object.assign({},EV.event):P[k],k); $("#evMsg").textContent="저장을 눌러야 화면에 반영돼요"; evWarn(); };
+  }
+  $("#f-photos").disabled=EV.photosEnv===false; if(EV.photosEnv===false) $("#f-photos").parentElement.title="서버 환경변수 PHOTOS=0 이라 사진을 받지 않아요";
+  if(!evFilled){ evFilled=true; fillEvent(e,e.preset); }
+}
+$("#evSave").onclick=async()=>{
+  const body={preset:evPreset||"custom",askName:$("#f-askName").checked,photos:$("#f-photos").checked}; F.forEach(k=>body[k]=$("#f-"+k).value);
+  try{ const j=await api("event",body); EV.event=j.event; fillEvent(j.event,j.event.preset); showEvent(); $("#evMsg").textContent="✅ 저장했어요. 켜진 앞 화면에도 바로 반영돼요"; $("#evWarn").hidden=true; }catch(e){}
+};
+$("#evPreview").onclick=()=>window.open("/?demo","_blank");
 async function loadInfo(){
-  try{ EV=await api("info"); $("#ev-code").textContent=EV.code;
+  try{ EV=await api("info"); showEvent(); $("#ev-code").textContent=EV.code;
     $("#ev-note").textContent=`코드를 아는 사람만 칠판을 보고 쓸 수 있어요 · 지금 앞 화면 ${EV.viewers}개 연결 · ${EV.retainDays?`글과 사진은 쓴 날부터 ${EV.retainDays}일 뒤 자동 삭제`:"자동 삭제 꺼짐"}${EV.fromEnv?" · 코드는 Render의 EVENT_CODE":""}`;
     $("#closeBoard").textContent=EV.closed?"🔓 방명록 다시 열기":"🔒 방명록 닫기";
     $("#closedBanner").hidden=!EV.closed;
@@ -61,11 +83,11 @@ function render(){
   if(filter==="today") items=items.filter(l=>l.timestamp>=t0);
   if(filter==="hidden") items=items.filter(l=>l.hidden);
   if(filter==="hold") items=items.filter(l=>l.hold&&!l.hidden);
-  if(q) items=items.filter(l=>(l.name+" "+l.text).toLowerCase().includes(q));
-  $("#rows").innerHTML=items.length?items.map((l,i)=>`<tr class="${l.hidden?"hid":l.hold?"hold":""}">
+  if(q) items=items.filter(l=>(l.name+" "+(l.extra||"")+" "+l.text).toLowerCase().includes(q));
+  evWarn(); $("#rows").innerHTML=items.length?items.map((l,i)=>`<tr class="${l.hidden?"hid":l.hold?"hold":""}">
     <td>${items.length-i}</td>
     <td>${l.timestamp?new Date(l.timestamp).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):""}</td>
-    <td><span class="chip" style="background:${COLORS[l.color]??"#eee"}"></span>${esc(l.name)}</td>
+    <td><span class="chip" style="background:${COLORS[l.color]??"#eee"}"></span>${esc(l.name)}${l.extra?`<br><small style="color:#8a83a3">${esc(l.extra)}</small>`:""}</td>
     <td>${l.photo?`<img src="${esc(l.photo)}" data-zoom>`:""}</td>
     <td class="msg">${esc(l.text)}${l.hold&&!l.hidden?`<span class="tag hold">${HOLD[l.hold]||"확인 대기"}</span>`:""}${l.hidden?`<span class="tag hid">숨김</span>`:""}${l.edited?`<span class="tag ed">고침</span>`:""}</td>
     <td class="act">${(l.hidden||l.hold)?`<button class="ok" data-k="${esc(l.key)}" data-a="show">${l.hold&&!l.hidden?"확인·공개":"보이기"}</button>`:`<button data-k="${esc(l.key)}" data-a="hide">숨기기</button>`}<button class="del" data-k="${esc(l.key)}" data-a="del">삭제</button></td>
@@ -81,29 +103,33 @@ $("#rows").addEventListener("click",async e=>{
   else if(b.dataset.a==="show"){ await api("show",{key:L.key}); load(); }
   else confirmBox("🗑️ 글을 삭제할까요?",`"${L.text.slice(0,30)}"\n삭제하면 되돌릴 수 없어요.\n\n[삭제] 그 학생이 새로 쓸 수 있어요\n[삭제+차단] 그 기기에서는 다시 못 써요`,async(block)=>{ await api("delete",{key:L.key,block}); load(); });
 });
+// 파일 이름: 행사 제목_날짜 (파일 이름에 못 쓰는 글자는 빼요)
+const fname=()=>(((EV&&EV.event&&EV.event.title)||"방명록").replace(/[\\/:*?"<>|\s]+/g,"_")+"_"+new Date().toISOString().slice(0,10));
 $("#zoom").onclick=()=>$("#zoom").style.display="none";
 $("#csv").onclick=()=>{
   const cell=v=>{ v=String(v??""); return /^[=+\-@\t\r]/.test(v)?"'"+v:v; };   // 엑셀 수식 끼워 넣기 막기
-  const rows=[["시간","이름","내용","상태","사진","고친 시간"],...all.map(l=>[new Date(l.timestamp||0).toLocaleString("ko-KR"),cell(l.name),cell(l.text),l.hidden?"숨김":l.hold?"확인 대기":"공개",l.photo?"Y":"",l.edited?new Date(l.edited).toLocaleString("ko-KR"):""])];
+  const xl=(EV&&EV.event&&EV.event.extraLabel)||"추가 칸";
+  const rows=[["시간","이름",xl,"내용","상태","사진","고친 시간"],...all.map(l=>[new Date(l.timestamp||0).toLocaleString("ko-KR"),cell(l.name),cell(l.extra||""),cell(l.text),l.hidden?"숨김":l.hold?"확인 대기":"공개",l.photo?"Y":"",l.edited?new Date(l.edited).toLocaleString("ko-KR"):""])];
   const csv="\uFEFF"+rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download="우리들의2026_방명록.csv"; a.click();
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"})); a.download=fname()+".csv"; a.click();
 };
 // 사진까지 담긴 기념 파일(HTML 한 장) — 인터넷 없이도 열리고, 브라우저에서 인쇄하면 PDF로도 남길 수 있어요
 $("#keep").onclick=()=>{
   const list=all.filter(l=>!l.hidden).slice().sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
   if(!list.length) return alert("남길 글이 아직 없어요");
+  const E=(EV&&EV.event)||{}, T=E.title||"방명록", BG={chalk:"#2f4b3c",sakura:"#5b3f57",calm:"#2c4060",festa:"#34305f"}[E.theme]||"#2f4b3c";
   const img=p=>typeof p==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(p)?`<img src="${p}" alt="">`:"";
-  const cards=list.map(l=>`<div class="c" style="background:${COLORS[l.color]??"#fffdf6"}">${img(l.photo)}<p>${esc(l.text).replace(/\n/g,"<br>")}</p><b>${esc(l.name)}</b><i>${new Date(l.timestamp||0).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</i></div>`).join("");
-  const html=`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>우리들의 2026 · 방명록</title><style>
-*{box-sizing:border-box;margin:0}body{font-family:"Noto Sans KR",sans-serif;background:#2f4b3c;color:#2b332e;padding:28px}
+  const cards=list.map(l=>`<div class="c" style="background:${COLORS[l.color]??"#fffdf6"}">${img(l.photo)}<p>${esc(l.text).replace(/\n/g,"<br>")}</p><b>${esc(EVT.sign(l,EV&&EV.event))}</b><i>${new Date(l.timestamp||0).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</i></div>`).join("");
+  const html=`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(T)} · 방명록</title><style>
+*{box-sizing:border-box;margin:0}body{font-family:"Noto Sans KR",sans-serif;background:${BG};color:#2b332e;padding:28px}
 h1{color:#fffdf6;text-align:center;font-size:30px}h1+p{color:#ffe98a;text-align:center;margin:6px 0 22px}
 .w{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;align-items:start}
 .c{border-radius:14px;padding:14px;box-shadow:0 3px 10px #0003;break-inside:avoid}
 .c img{width:100%;border-radius:10px;margin-bottom:8px}.c p{font-size:16px;line-height:1.5;word-break:keep-all}
 .c b{display:block;margin-top:8px}.c i{font-size:11px;color:#6b6b6b;font-style:normal}
 @media print{body{background:#fff}h1{color:#2f4b3c}h1+p{color:#4b6b58}}
-</style></head><body><h1>✎ 우리들의 2026</h1><p>마음 ${list.length}개 · ${new Date().toLocaleDateString("ko-KR")} 저장</p><div class="w">${cards}</div></body></html>`;
-  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([html],{type:"text/html"})); a.download="우리들의2026_방명록_기념.html"; a.click();
+</style></head><body><h1>✎ ${esc(T)}</h1><p>${E.subtitle?esc(E.subtitle)+" · ":""}마음 ${list.length}개 · ${new Date().toLocaleDateString("ko-KR")} 저장</p><div class="w">${cards}</div></body></html>`;
+  const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([html],{type:"text/html"})); a.download=fname()+"_기념.html"; a.click();
 };
 $("#delPhotos").onclick=()=>confirmBox("사진을 모두 지울까요?","글은 남고 사진만 지워져요.\n되돌릴 수 없어요.",async()=>{ await api("clear-photos",{}); load(); },"사진 삭제");
 $("#reset").onclick=()=>confirmBox("🧹 전체 삭제할까요?",`글 ${all.length}개가 모두 지워져요.\n되돌릴 수 없어요.\n(먼저 CSV로 받아 두세요)\n\n행사 코드도 새로 바뀌고 앞 화면이 꺼져요. '앞 화면 열기'로 다시 띄워 주세요.`,async()=>{ await api("reset",{}); loadInfo(); load(); },"모두 삭제");

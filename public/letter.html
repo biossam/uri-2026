@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>방명록 남기기</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="theme.css">
 <script src="config.js"></script>
+<script src="js/event.js"></script>
 <style>
 :root{--c0:#fbf8ee;--c1:#ffe98a;--c2:#ffb3c7;--c3:#a8dcff;--c4:#bff0a6;--c5:#ffc89a;--board:#2f4b3c}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -58,9 +60,12 @@ textarea::placeholder{color:#ffffff55}
 .forget{margin-top:14px;background:transparent;border:1px dashed #ffffff66;color:#ffffffcc;border-radius:10px;padding:9px 12px;font:13px "Noto Sans KR";cursor:pointer;width:100%}
 #tray{max-width:460px;margin:8px auto 0;height:14px;background:linear-gradient(#9c6a3f,#7a4c28);border-radius:3px;position:relative;box-shadow:0 4px 6px #0005}
 #tray i{position:absolute;bottom:8px;height:9px;border-radius:5px}
+#extraRow{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-top:4px;font-family:Gaegu;font-weight:700;color:var(--c);font-size:18px}
+#extra{border:0;border-bottom:2px dashed #ffffff55;background:transparent;font-family:Gaegu,cursive;font-weight:700;font-size:18px;width:140px;color:var(--c);outline:none;text-align:right}
+#extra::placeholder{color:#ffffff55}
 </style>
 </head>
-<body>
+<body class="write">
 <svg width="0" height="0" style="position:absolute">
   <filter id="chalkF" x="-5%" y="-5%" width="110%" height="110%">
     <feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="3" result="n"/>
@@ -70,7 +75,7 @@ textarea::placeholder{color:#ffffff55}
     <feComposite in="d" in2="holes" operator="in"/>
   </filter>
 </svg>
-<div class="wrap">
+<div class="wrap"><span class="wdeco" style="right:14px;top:10px" id="wd1"></span><span class="wdeco" style="left:12px;top:12px" id="wd2"></span>
   <header>
     <h1 id="title" class="chalk">방명록 남기기</h1>
     <svg class="uline chalk" viewBox="0 0 200 12" preserveAspectRatio="none"><path d="M3 7c40-4 90-5 130-2s50 2 64-1" fill="none" stroke="#ffe98a" stroke-width="3" stroke-linecap="round"/></svg>
@@ -87,7 +92,7 @@ textarea::placeholder{color:#ffffff55}
   <details id="privacy" class="privacy">
     <summary>🔒 내 정보는 이렇게 다뤄요 (눌러서 보기)</summary>
     <ul>
-      <li><b>남는 것:</b> 이름(별명도 괜찮아요), 쓴 글, 고른 색, 붙인 사진</li>
+      <li><b>남는 것:</b> <span id="keepTxt">이름(별명도 괜찮아요), 쓴 글, 고른 색, 붙인 사진</span></li>
       <li><b>보는 사람:</b> 행사장 칠판을 보는 사람들과 선생님이에요. 코드를 아는 사람만 볼 수 있어요.</li>
       <li><b>지워지는 때:</b> <span id="retainTxt">행사가 끝나면</span> 모두 지워져요.</li>
       <li><b>쓰지 말아요:</b> 전화번호, 집 주소, 친구 험담. 전화번호나 주소처럼 보이면 선생님이 먼저 확인해요.</li>
@@ -100,13 +105,14 @@ textarea::placeholder{color:#ffffff55}
     <div class="lbl chalk"><span>① 분필 색 고르기</span></div>
     <div class="dots" id="dots"></div>
 
-    <div class="lbl chalk"><span>② 한 마디 쓰기</span><span id="cnt"></span></div>
+    <div class="lbl chalk"><span id="promptLbl">② 한 마디 쓰기</span><span id="cnt"></span></div>
     <div id="writeBox">
       <textarea id="msg" class="chalk" placeholder="여기에 분필로 써 보세요 ✎"></textarea>
-      <div class="meta"><span></span><label class="chalk">— <input id="name" maxlength="10" placeholder="이름·별명"></label></div>
+      <div class="meta"><span></span><label class="chalk" id="nameRow">— <input id="name" maxlength="10" placeholder="이름·별명"></label></div>
+      <div id="extraRow" class="chalk" hidden><span id="extraLbl">소속</span><input id="extra" maxlength="20"></div>
     </div>
 
-    <div class="lbl chalk"><span>③ 사진 붙이기 (선택)</span></div>
+    <div class="lbl chalk" id="photoHead"><span>③ 사진 붙이기 (선택)</span></div>
     <label id="photoLbl"><span class="ic">📷</span><span><b>사진을 자석으로 붙여요</b><small>함께 찍은 사진이나 오늘 만든 작품</small></span>
       <input id="photoInput" type="file" accept="image/*" hidden></label>
     <div id="photoPrev"><div class="pol"><img id="prevImg" alt="미리보기"><button id="photoDel" type="button">✕</button></div><small>글 옆에 붙어요 · 사진이 있는 글은 선생님이 확인한 뒤 칠판에 써져요</small></div>

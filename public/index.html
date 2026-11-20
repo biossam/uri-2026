@@ -6,7 +6,9 @@
 <title>우리들의 2026</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="theme.css">
 <script src="config.js"></script>
+<script src="js/event.js"></script>
 <style>
 :root{
   /* 분필 색 */
@@ -160,6 +162,7 @@ body{font-family:"Noto Sans KR",sans-serif;display:flex;align-items:center;justi
     <svg class="dood chalk" style="right:23%;bottom:3%;width:6cqh;height:6cqh" viewBox="0 0 40 40"><path d="M20 34C6 24 3 16 8 10s11-2 12 3c1-5 7-9 12-3s2 14-12 24z" fill="none" stroke="#ffb3c7" stroke-width="2.4" stroke-linejoin="round"/></svg>
     <svg class="dood chalk" style="left:1.2%;bottom:3%;width:7cqh;height:7cqh" viewBox="0 0 50 50"><g fill="none" stroke="#bff0a6" stroke-width="2.3" stroke-linecap="round"><path d="M25 45V20"/><path d="M25 28c-8 0-12-6-12-12 7 0 12 5 12 12zM25 24c0-8 5-13 12-13 0 7-5 13-12 13z"/></g></svg>
 
+    <div id="deco"></div>
     <div id="titleBox" title="관리자">
       <h1 id="title" class="chalk">우리들의 2026</h1>
       <svg class="titleLine chalk" viewBox="0 0 300 20" preserveAspectRatio="none"><path d="M3 12c40-6 90-8 150-5s100 4 144-2" fill="none" stroke="#ffe98a" stroke-width="3" stroke-linecap="round"/></svg>
@@ -167,7 +170,7 @@ body{font-family:"Noto Sans KR",sans-serif;display:flex;align-items:center;justi
     </div>
 
     <div id="notes"></div>
-    <div id="empty" class="chalk"><div><b>첫 번째 낙서를 기다리고 있어요 ✎</b><span>QR을 찍고 한 마디 남겨 주세요</span></div></div>
+    <div id="empty" class="chalk"><div><b>첫 번째 낙서를 기다리고 있어요 ✎</b><span id="emptySub">QR을 찍고 한 마디 남겨 주세요</span></div></div>
 
     <div id="side">
       <a id="qrCard" target="_blank" rel="noopener">

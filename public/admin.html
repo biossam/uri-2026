@@ -51,7 +51,22 @@ tr.hold td{background:#fffbea}
 .event .k{font-size:12px;opacity:.75;margin-right:8px}.event b{font-family:Jua;font-size:26px;letter-spacing:.15em;color:#ffe98a}
 .event .links{display:flex;gap:8px;flex-wrap:wrap}.event button{padding:8px 12px;border-radius:9px;border:0;background:#fff;color:#2f4b3c;font:700 13px "Noto Sans KR";cursor:pointer}
 .event .note{flex-basis:100%;font-size:12px;opacity:.8}
-@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+.evset{background:#fff;border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 2px 8px #5b45b011}
+.evset summary{cursor:pointer;font-family:Jua;font-size:19px;color:#2f4b3c}
+.evset summary small{font:500 12px "Noto Sans KR";color:#8a83a3;margin-left:8px}
+.presets{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.presets button{padding:9px 14px;border-radius:12px;border:2px solid #d6e2da;background:#fff;cursor:pointer;font:700 14px "Noto Sans KR";color:#2f4b3c}
+.presets button.on{border-color:#2f4b3c;background:#eef4f0}
+.fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 14px}
+.fgrid label{display:block;font-size:12px;font-weight:700;color:#4b6b58}
+.fgrid input,.fgrid select{width:100%;margin-top:4px;padding:8px 10px;border-radius:9px;border:1px solid #d6e2da;font:inherit}
+.toggles{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0 4px;font-weight:700;color:#2f4b3c}
+.toggles input{accent-color:#2f4b3c;width:16px;height:16px;vertical-align:-3px;margin-right:4px}
+.evbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
+.evbtns button{padding:9px 14px;border-radius:10px;border:0;background:#2f4b3c;color:#fff;font:700 14px "Noto Sans KR";cursor:pointer}
+.evbtns button.sub{background:#eef4f0;color:#2f4b3c}
+#evMsg{font-size:12px;font-weight:700;color:#4b6b58}#evWarn{font-size:12px;color:#8a6100;background:#fff3cd;border-radius:8px;padding:6px 10px;margin-top:8px}
+@media(max-width:640px){.fgrid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -68,6 +83,25 @@ tr.hold td{background:#fffbea}
   <div class="links"><button id="openFront">📺 앞 화면 열기</button><button id="copyLetter">📋 글쓰기 주소 복사</button><button id="closeBoard">🔒 방명록 닫기</button><button id="rotate">🔑 코드 바꾸기</button><button id="logout">로그아웃</button></div>
   <div class="note" id="ev-note"></div>
 </div>
+<details class="evset" id="evset">
+  <summary>🎪 행사 설정 <small id="evNow"></small></summary>
+  <div class="presets" id="presets"></div>
+  <div class="fgrid">
+    <label>앞 화면 제목<input id="f-title" maxlength="24"></label>
+    <label>앞 화면 부제<input id="f-subtitle" maxlength="40"></label>
+    <label>글쓰기 화면 제목<input id="f-writeTitle" maxlength="24"></label>
+    <label>글쓰기 화면 안내<input id="f-writeSub" maxlength="40"></label>
+    <label>질문 (글쓰기 칸 위에 나와요)<input id="f-prompt" maxlength="50" placeholder="비우면 '한 마디 쓰기'"></label>
+    <label>추가 칸 이름 (예: 소속, 학년)<input id="f-extraLabel" maxlength="8" placeholder="비우면 추가 칸 없음"></label>
+    <label>테마<select id="f-theme"><option value="chalk">🎓 초록 칠판</option><option value="sakura">🌸 벚꽃</option><option value="calm">📖 차분한 파랑</option><option value="festa">🎉 축제</option></select></label>
+  </div>
+  <div class="toggles">
+    <label><input type="checkbox" id="f-askName">이름 받기</label>
+    <label><input type="checkbox" id="f-photos">사진 받기</label>
+  </div>
+  <div id="evWarn" hidden></div>
+  <div class="evbtns"><button id="evSave">💾 행사 설정 저장</button><button class="sub" id="evPreview">👀 예시 화면 보기</button><span id="evMsg"></span></div>
+</details>
 <div class="stats">
   <div><b id="s-total">0</b><span>전체</span></div>
   <div><b id="s-today">0</b><span>오늘</span></div>
@@ -83,11 +117,12 @@ tr.hold td{background:#fffbea}
   <button id="delPhotos" class="danger">🗑️ 사진 전체 삭제</button>
   <button id="reset" class="danger">🧹 전체 삭제(리셋)</button>
 </div>
-<table><thead><tr><th>#</th><th>시간</th><th>이름</th><th>사진</th><th>내용</th><th>관리</th></tr></thead><tbody id="rows"></tbody></table>
+<table><thead><tr><th>#</th><th>시간</th><th>이름 · 추가 칸</th><th>사진</th><th>내용</th><th>관리</th></tr></thead><tbody id="rows"></tbody></table>
 
 <div id="modal"><div class="box"><b id="mTitle"></b><p id="mText"></p><div class="bb"><button id="mNo">취소</button><button id="mOk">삭제</button><button id="mBlock" style="background:#7a1f1f;color:#fff;display:none">삭제+차단</button></div></div></div>
 <div id="zoom"><img alt=""></div>
 
+<script src="js/event.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

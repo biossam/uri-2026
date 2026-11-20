@@ -1,4 +1,4 @@
-// 우리들의 2026 — 칠판 방명록 서버
+// 우리들의 2026 — 칠판 방명록 서버 (졸업식·입학식·수업 공개·연구회 페스타 등 행사별로 바꿔 쓰기)
 // 외부 패키지 없이 Node 기본 기능만 씁니다. (Render 무료 서버용)
 //  · 앞 화면은 /api/stream (SSE)으로 새 글을 실시간으로 받습니다.
 //  · 한 기기(브라우저)에 글 1개. 처음 쓰면 '수정 열쇠' 쿠키를 받고, 그 뒤로는 고치기만 됩니다.
@@ -32,11 +32,36 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");   // onpo
 const DATA_FILE = path.join(DATA_DIR, "letters.json");
 const IS_PROD = !!process.env.RENDER || process.env.NODE_ENV === "production";   // Render·onpod(Dockerfile) 실제 서버
 
+/* ── 행사 종류 ── */
+// 행사마다 제목·문구·테마·질문·추가 칸·이름/사진 받기를 바꿔요. 한 번에 행사 하나만 열어요.
+const THEMES = ["chalk", "sakura", "calm", "festa"];
+const PRESETS = {
+  graduation: { label: "🎓 졸업식", title: "우리들의 2026", subtitle: "졸업을 축하해요, 우리들의 마음을 남겨요", writeTitle: "졸업 축하 한 마디", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "졸업하는 친구, 선생님께 하고 싶은 말", extraLabel: "", askName: true, photos: true, theme: "chalk" },
+  entrance:   { label: "🌸 입학식", title: "입학을 축하해요", subtitle: "새 친구들을 환영해요", writeTitle: "입학 축하 한 마디", writeSub: "새 친구에게 따뜻한 말을 건네요", prompt: "새 친구에게 해 주고 싶은 말", extraLabel: "", askName: true, photos: true, theme: "sakura" },
+  openclass:  { label: "📖 수업 공개", title: "오늘의 수업", subtitle: "함께해 주셔서 감사합니다", writeTitle: "수업 소감 남기기", writeSub: "이름 없이 편하게 남겨 주세요", prompt: "오늘 수업에서 좋았던 점이나 궁금한 점", extraLabel: "", askName: false, photos: false, theme: "calm" },
+  festa:      { label: "🎉 연구회 페스타", title: "연구회 페스타", subtitle: "오늘의 배움과 만남을 남겨요", writeTitle: "페스타 방명록", writeSub: "쓰는 즉시 앞 화면에 써져요", prompt: "오늘 페스타에서 기억에 남는 것", extraLabel: "소속", askName: true, photos: true, theme: "festa" },
+};
+function cleanEvent(b, base) {
+  const e = Object.assign({}, base);
+  if (typeof b.preset === "string" && (PRESETS[b.preset] || b.preset === "custom")) e.preset = b.preset;
+  const t = (k, max) => { if (typeof b[k] === "string") e[k] = clean(b[k], max).replace(/\n/g, " "); };
+  t("title", 24); t("subtitle", 40); t("writeTitle", 24); t("writeSub", 40); t("prompt", 50); t("extraLabel", 8);
+  if (typeof b.askName === "boolean") e.askName = b.askName;
+  if (typeof b.photos === "boolean") e.photos = b.photos;
+  if (THEMES.includes(b.theme)) e.theme = b.theme;
+  delete e.label;
+  if (!e.title) e.title = "방명록";
+  return e;
+}
+const eventPub = () => Object.assign({}, db.event, { photos: PHOTOS && db.event.photos });
+
 /* ── 저장 ── */
 // letters: {key, tok(수정 열쇠의 해시), name, text, color, photo, timestamp, edited, hidden, hold}
 //   hidden = 선생님이 숨김 / hold = 확인 대기(욕설 의심·사진)
-let db = { letters: [], revoked: [], code: "", closed: false };
+const freshEvent = (k = "graduation") => Object.assign({ preset: k }, PRESETS[k]);
+let db = { letters: [], revoked: [], code: "", closed: false, event: freshEvent() };
 try { const d = JSON.parse(fs.readFileSync(DATA_FILE, "utf8")); if (d && Array.isArray(d.letters)) db = Object.assign(db, d); } catch (e) {}
+db.event = cleanEvent(db.event || {}, freshEvent());
 // 행사 코드: 환경변수 EVENT_CODE가 있으면 그것, 없으면 처음 켤 때 만들어 저장 (헷갈리는 0/O, 1/I/L 뺌)
 function newCode() { const A = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; let c = ""; for (const b of crypto.randomBytes(6)) c += A[b % A.length]; return c; }
 const ENV_CODE = String(process.env.EVENT_CODE || "").trim().toUpperCase();
@@ -54,8 +79,8 @@ const sha = s => crypto.createHash("sha256").update(String(s)).digest("hex");
 const visible = L => !L.hidden && !L.hold;
 // 확인 대기 이유: 욕설 의심 > 확인 안 된 사진 > (모두 확인 모드) 확인 안 된 글
 function holdFor(L) {
-  if (personalInfo(L.name, L.text) && !L.textOk) return "privacy";
-  if (suspicious(L.name, L.text) && !L.textOk) return "words";
+  if (personalInfo(L.name, L.extra || "", L.text) && !L.textOk) return "privacy";
+  if (suspicious(L.name, L.extra || "", L.text) && !L.textOk) return "words";
   if (L.photo && PHOTO_REVIEW && !L.photoOk) return "photo";
   if (REVIEW_ALL && !L.textOk) return "all";
   return "";
@@ -69,8 +94,8 @@ function broadcast(type, data) {
   for (const res of clients) { try { res.write(msg); } catch (e) {} }
 }
 setInterval(() => { for (const res of clients) { try { res.write(": ping\n\n"); } catch (e) {} } }, 25000);
-const pub = L => ({ key: L.key, name: L.name, text: L.text, color: L.color, photo: L.photo || null, timestamp: L.timestamp });
-const adminView = L => ({ key: L.key, name: L.name, text: L.text, color: L.color, photo: L.photo || null, timestamp: L.timestamp, edited: L.edited || 0, hidden: !!L.hidden, hold: L.hold || "" });
+const pub = L => ({ key: L.key, name: L.name, extra: L.extra || "", text: L.text, color: L.color, photo: L.photo || null, timestamp: L.timestamp });
+const adminView = L => ({ key: L.key, name: L.name, extra: L.extra || "", text: L.text, color: L.color, photo: L.photo || null, timestamp: L.timestamp, edited: L.edited || 0, hidden: !!L.hidden, hold: L.hold || "" });
 // 글이 바뀐 뒤 앞 화면에 알리기 (보이게 됐는지 / 사라졌는지 / 내용만 바뀌었는지)
 function announce(L, wasVisible) {
   const now = visible(L);
@@ -220,7 +245,7 @@ const server = http.createServer(async (req, res) => {
     if (p === "/healthz") return send(res, 200, { ok: true });
 
     // 화면이 처음 물어보는 기본 정보 (코드 없이)
-    if (p === "/api/info" && req.method === "GET") return send(res, 200, { closed: !!db.closed, retainDays: RETAIN_DAYS, photos: PHOTOS, photoReview: PHOTO_REVIEW, reviewAll: REVIEW_ALL, maxChars: MAX_CHARS });
+    if (p === "/api/info" && req.method === "GET") return send(res, 200, { closed: !!db.closed, retainDays: RETAIN_DAYS, photos: PHOTOS && db.event.photos, event: eventPub(), photoReview: PHOTO_REVIEW, reviewAll: REVIEW_ALL, maxChars: MAX_CHARS });
 
     // 여기부터는 행사 코드가 있어야 해요 (보기·쓰기·QR)
     if (p === "/api/stream" || p === "/api/mine" || p === "/api/letters" || p === "/api/qr.svg" || p === "/api/join" || p === "/api/forget") {
@@ -258,7 +283,7 @@ const server = http.createServer(async (req, res) => {
       const { L, revoked } = myLetter(req);
       if (revoked) return send(res, 200, { revoked: true });
       if (!L) return send(res, 200, { mine: null });
-      return send(res, 200, { mine: { name: L.name, text: L.text, color: L.color, photo: L.photo || null, hold: L.hold || "", hidden: !!L.hidden } });
+      return send(res, 200, { mine: { name: L.name, extra: L.extra || "", text: L.text, color: L.color, photo: L.photo || null, hold: L.hold || "", hidden: !!L.hidden } });
     }
 
     // 글 쓰기 / 고치기 (한 기기에 1개)
@@ -269,13 +294,14 @@ const server = http.createServer(async (req, res) => {
       if (me.revoked) return send(res, 403, { error: "선생님이 이 기기의 글을 지웠어요. 더 이상 쓸 수 없어요." });
 
       const text = clean(b.text, MAX_CHARS);
-      const name = clean(b.name, 10).replace(/\n/g, " ") || "익명";
+      const name = db.event.askName ? (clean(b.name, 10).replace(/\n/g, " ") || "익명") : "익명";
+      const extra = db.event.extraLabel ? clean(b.extra, 20).replace(/\n/g, " ") : "";
       if (!text) return send(res, 400, { error: "한 마디를 써 주세요" });
       const color = Number.isInteger(b.color) && b.color >= 0 && b.color < 6 ? b.color : null;
       let photo = null, keep = false;
       if (b.photo === "keep") keep = true;
       else if (typeof b.photo === "string" && b.photo) {
-        if (!PHOTOS) return send(res, 400, { error: "이번 행사는 사진을 받지 않아요" });
+        if (!PHOTOS || !db.event.photos) return send(res, 400, { error: "이번 행사는 사진을 받지 않아요" });
         if (b.photo.length > MAX_PHOTO || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(b.photo)) return send(res, 400, { error: "사진이 너무 크거나 형식이 맞지 않아요" });
         const bin = Buffer.from(b.photo.slice(23), "base64");
         if (bin[0] !== 0xFF || bin[1] !== 0xD8) return send(res, 400, { error: "사진 형식이 맞지 않아요" });
@@ -287,8 +313,8 @@ const server = http.createServer(async (req, res) => {
         if (!editPerTok(me.L.key)) return send(res, 429, { error: "조금만 기다렸다가 다시 고쳐 주세요" });
         const L = me.L, was = visible(L);
         const photoChanged = !keep && photo !== (L.photo || null);
-        const textChanged = L.text !== text || L.name !== name;
-        L.name = name; L.text = text; L.color = color; if (!keep) L.photo = photo;
+        const textChanged = L.text !== text || L.name !== name || (L.extra || "") !== extra;
+        L.name = name; L.extra = extra; L.text = text; L.color = color; if (!keep) L.photo = photo;
         if (photoChanged) L.photoOk = false;
         if (textChanged) L.textOk = false;
         L.edited = Date.now();
@@ -301,7 +327,7 @@ const server = http.createServer(async (req, res) => {
       if (!newPerIp(ip) || !newGlobal("all")) return send(res, 429, { error: "지금 글이 너무 많이 들어오고 있어요. 잠시 뒤에 다시 보내 주세요" });
       if (db.letters.length >= MAX_LETTERS) return send(res, 507, { error: "칠판이 가득 찼어요" });
       const tok = crypto.randomBytes(24).toString("hex");
-      const L = { key: Date.now().toString(36) + crypto.randomBytes(4).toString("hex"), tok: sha(tok), name, text, color, photo, timestamp: Date.now(), edited: 0, hidden: false, photoOk: false, textOk: false };
+      const L = { key: Date.now().toString(36) + crypto.randomBytes(4).toString("hex"), tok: sha(tok), name, extra, text, color, photo, timestamp: Date.now(), edited: 0, hidden: false, photoOk: false, textOk: false };
       L.hold = holdFor(L);
       const hold = L.hold;
       db.letters.push(L); save();
@@ -325,11 +351,16 @@ const server = http.createServer(async (req, res) => {
       if (!sessionOk(req)) return send(res, 401, { error: "다시 로그인해 주세요" });
       const act = p.slice("/api/admin/".length);
       if (act === "check") return send(res, 200, { ok: true });
-      if (act === "info") return send(res, 200, { code: eventCode(), fromEnv: !!ENV_CODE, retainDays: RETAIN_DAYS, closed: !!db.closed, viewers: clients.size, weak: WEAK_PW });
+      if (act === "info") return send(res, 200, { event: db.event, presets: PRESETS, themes: THEMES, photosEnv: PHOTOS, code: eventCode(), fromEnv: !!ENV_CODE, retainDays: RETAIN_DAYS, closed: !!db.closed, viewers: clients.size, weak: WEAK_PW });
       if (act === "letters" && req.method === "GET") return send(res, 200, db.letters.map(adminView));
       if (req.method !== "POST") return send(res, 405, { error: "method" });
       const b = await readBody(req, 10 * 1024);
       if (act === "logout") { sessions.delete(sha(String(req.headers["x-admin-session"]))); return send(res, 200, { ok: true }); }
+      if (act === "event") {
+        const base = PRESETS[b.preset] && b.reset ? freshEvent(b.preset) : db.event;
+        db.event = cleanEvent(b, base); save(); broadcast("event", eventPub());
+        return send(res, 200, { ok: true, event: db.event });
+      }
       if (act === "close") { db.closed = !!b.closed; save(); if (db.closed) dropAll(); return send(res, 200, { ok: true, closed: db.closed }); }
       if (act === "rotate-code") {
         if (ENV_CODE) return send(res, 400, { error: "코드를 Render 환경변수 EVENT_CODE로 정해 두셨어요. Render에서 바꿔 주세요." });
@@ -345,7 +376,7 @@ const server = http.createServer(async (req, res) => {
         save(); if (was) broadcast("remove", { key: L.key }); return send(res, 200, { ok: true });
       }
       if (act === "clear-photos") { db.letters.forEach(x => { x.photo = null; x.hold = holdFor(x); }); save(); broadcast("init", db.letters.filter(visible).map(pub)); return send(res, 200, { ok: true }); }
-      if (act === "reset") { db = { letters: [], revoked: [], code: ENV_CODE ? "" : newCode(), closed: false }; save(); dropAll(); return send(res, 200, { ok: true }); }
+      if (act === "reset") { db = { letters: [], revoked: [], code: ENV_CODE ? "" : newCode(), closed: false, event: db.event }; save(); dropAll(); return send(res, 200, { ok: true }); }
       return send(res, 404, { error: "없는 기능이에요" });
     }
 

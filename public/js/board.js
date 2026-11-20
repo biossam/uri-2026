@@ -24,7 +24,18 @@ const FRAMES=[
   `<path d="M10 6C4 30 4 70 10 94M90 6c6 24 6 64 0 88"/>`,
 ];
 
-document.title=C.title; $("#title").textContent=C.title; $("#subtitle").textContent=C.subtitle||"";
+/* 행사 설정 (제목·부제·테마·꾸밈) — 서버에서 받고, 관리자가 바꾸면 실시간으로 다시 입혀요 */
+let EV=EVT.fallback();
+const DECO_POS=[["47%","12%"],["72%","13%"],["44%","auto","1.5%"],["70%","auto","2.5%"]];
+function applyEvent(ev,relayout){
+  EV=Object.assign(EVT.fallback(),ev||{}); EVT.theme(EV);
+  document.title=EV.title; $("#title").textContent=EV.title; $("#subtitle").textContent=EV.subtitle||"";
+  $("#emptySub").textContent=EV.prompt?`QR을 찍고 남겨 주세요 · ${EV.prompt}`:"QR을 찍고 한 마디 남겨 주세요";
+  const d=EVT.deco[EV.theme]||EVT.deco.chalk;
+  $("#deco").innerHTML=d.map((e,i)=>{ const p=DECO_POS[i]; return `<span style="left:${p[0]};top:${p[1]};${p[2]?`bottom:${p[2]}`:""}">${e}</span>`; }).join("");
+  if(relayout) showPage(cur,{instant:true});
+}
+applyEvent(null,false);
 
 /* 제목 클릭 → 관리자 화면 (비밀번호는 서버가 확인) */
 $("#titleBox").addEventListener("click",()=>window.open("admin.html","_blank"));
@@ -80,7 +91,7 @@ function buildNote(L,cell,W,H,delay){
   el.innerHTML=`<div class="ink chalk">
       ${FRAMES[sd.frame]?`<svg class="frame" viewBox="0 0 100 100" preserveAspectRatio="none">${FRAMES[sd.frame]}</svg>`:""}
       <div class="txt" style="${hasPhoto?"margin-right:34%":""}">${esc(L.text)}</div>
-      <div class="from">— ${esc(L.name||"익명")}</div>
+      <div class="from">${esc(EVT.sign(L,EV))}</div>
       ${mk?`<span class="mark" style="left:6%;bottom:4%">${mk}</span>`:""}
     </div>
     ${hasPhoto?`<div class="pol" style="--pr:${(sd.pr*8).toFixed(1)}deg;--mag:${MAGS[sd.mag]};right:2%;top:8%;width:32%;aspect-ratio:.86"><img src="${esc(L.photo)}" alt=""></div>`:""}`;
@@ -202,9 +213,16 @@ function fakePhoto(i){
   g.fillStyle="#3b3350aa"; g.font="bold 40px 'Noto Sans KR',sans-serif"; g.textAlign="center"; g.fillText("예시 사진",200,215);
   return c.toDataURL("image/jpeg",.7);
 }
+const DEMOS={
+  graduation:[["지우","6년 동안 함께해서 행복했어! 중학교 가서도 연락하자",1],["민준","선생님 감사합니다. 잊지 않을게요"],["서연","우리 반 최고! 다들 졸업 축하해 🎓"],["하준","운동회 때 이어달리기 1등 한 거 생각나"],["예린","언제나 응원할게 ♡"],["도윤","졸업 축하해요, 형 누나들!"],["수아","사진 남겨요 📷",1],["시우","행복한 초등학교 생활이었어요"]],
+  entrance:[["6학년 언니","입학을 축하해요! 학교에서 만나면 반갑게 인사해요 🌸"],["2학년 형","급식이 엄청 맛있어요!"],["담임 선생님","만나서 반가워요. 즐겁게 지내요",1],["엄마","씩씩하게 다니자, 사랑해"],["5학년","도서관에 재밌는 책이 많아요"],["1학년 선배","학교 정말 재밌어요!"]],
+  openclass:[["","아이들이 서로 질문하는 모습이 인상 깊었어요"],["","모둠 활동에서 친구 의견을 잘 듣는 게 보였어요"],["","집에서도 오늘 배운 걸 이야기해 볼게요"],["","활동지가 깔끔해서 따라가기 쉬웠어요"],["","발표할 때 기다려 주는 분위기가 좋았어요"],["","궁금한 점: 다음 차시엔 무엇을 배우나요?"]],
+  festa:[["김선생","AI 미술 수업 부스가 제일 기억에 남아요","성남초",1],["박선생","내일 바로 교실에서 써 볼게요","분당초"],["이선생","좋은 자료 나눠 주셔서 감사합니다","판교초"],["최선생","선생님들과 이야기 나눈 시간이 소중했어요","수내초"],["정선생","내년에도 꼭 올게요! 🎉","정자초"],["한선생","교실 놀이 아이디어 많이 얻어 가요","야탑초"]],
+};
 function startDemo(){
   $("#dot").className="demo"; $("#liveTxt").textContent="예시 모드"; $("#badge").hidden=false;
-  DEMO.forEach((d,i)=>onLetter({key:"demo"+i,name:d[0],text:d[1],photo:d[2]?fakePhoto(i):null},false));
+  const list=DEMOS[EV.preset]||DEMO;
+  list.forEach((d,i)=>onLetter({key:"demo"+i,name:d[0]||"익명",text:d[1],extra:typeof d[2]==="string"?d[2]:"",photo:d[d.length-1]===1?fakePhoto(i):null},false));
 }
 function fakeArrival(){ const d=EXTRA[extraIdx++%EXTRA.length]; onLetter({key:"live"+Date.now(),name:d[0],text:d[1],photo:d[2]?fakePhoto(extraIdx):null},true); }
 
@@ -226,6 +244,7 @@ async function connect(){
   es.addEventListener("add",e=>onLetter(JSON.parse(e.data),true));
   es.addEventListener("remove",e=>removeLetter(JSON.parse(e.data).key));
   es.addEventListener("update",e=>updateLetter(JSON.parse(e.data)));
+  es.addEventListener("event",e=>applyEvent(JSON.parse(e.data),true));
   es.onerror=async()=>{
     $("#dot").className=""; $("#liveTxt").textContent="다시 연결하는 중…";
     // 끊긴 이유 확인: 선생님이 방명록을 닫았거나 코드를 바꿨으면 다시 붙지 않아요
@@ -236,4 +255,5 @@ async function connect(){
   };
 }
 updateChrome();
-document.fonts.ready.then(connect);
+const infoP=fetch("/api/info").then(r=>r.json()).then(i=>applyEvent(i.event,false)).catch(()=>{});
+Promise.all([document.fonts.ready,infoP]).then(connect);

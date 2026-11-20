@@ -1,0 +1,31 @@
+/* 행사 테마 — 관리자 화면 '행사 설정'에서 고른 테마가 <html data-theme="…"> 로 들어와요 */
+
+/* 🎓 칠판 (졸업식) — 기본값은 index.html·letter.html 에 그대로 있어요 */
+
+/* 🌸 벚꽃 (입학식) */
+html[data-theme="sakura"]{--board:#5b3f57;--c1:#ffd6e4;--c3:#ffe6a8}
+html[data-theme="sakura"] #stage,html[data-theme="sakura"] body.write{background:linear-gradient(180deg,#f4d3d8,#e3aab6 60%,#c98597)}
+html[data-theme="sakura"] #tray{background:linear-gradient(#e6b3bf,#c98597)}
+html[data-theme="sakura"] #pager{color:#5b3f57}
+html[data-theme="sakura"] #qrCard h3{color:#5b3f57}
+
+/* 📖 차분한 파랑 (수업 공개) */
+html[data-theme="calm"]{--board:#2c4060;--c1:#ffe6a0;--c3:#bfe3ff}
+html[data-theme="calm"] #stage,html[data-theme="calm"] body.write{background:linear-gradient(180deg,#d9cbb0,#bfa983 60%,#9d875f)}
+html[data-theme="calm"] #tray{background:linear-gradient(#c2ab84,#9d875f)}
+html[data-theme="calm"] #pager{color:#3a3020}
+html[data-theme="calm"] #qrCard h3{color:#2c4060}
+
+/* 🎉 축제 (연구회 페스타) */
+html[data-theme="festa"]{--board:#34305f;--c1:#ffd95e;--c3:#9fe7ff}
+html[data-theme="festa"] #stage,html[data-theme="festa"] body.write{background:
+  repeating-linear-gradient(45deg,#ffd166 0 3%,#ff9fb2 3% 6%,#8fd3ff 6% 9%,#b8f2a6 9% 12%)}
+html[data-theme="festa"] #stage::before{display:none}
+html[data-theme="festa"] #tray{background:linear-gradient(#f7b267,#e07a3f)}
+html[data-theme="festa"] #pager{color:#34305f;text-shadow:0 0 .4cqh #fff}
+html[data-theme="festa"] #qrCard h3{color:#34305f}
+
+/* 테마 꾸밈 (이모지) */
+#deco{position:absolute;inset:0;pointer-events:none;z-index:1}
+#deco span{position:absolute;font-size:4cqh;opacity:.85;filter:drop-shadow(0 .3cqh .4cqh #0005)}
+.wdeco{position:absolute;font-size:22px;opacity:.85;pointer-events:none}
