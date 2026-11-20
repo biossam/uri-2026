@@ -9,7 +9,7 @@ function applyEvent(ev){
   $("#extraRow").hidden=!EV.extraLabel; $("#extraLbl").textContent=EV.extraLabel||""; $("#extra").placeholder=EV.extraLabel?"(선택)":"";
   const keep=[]; if(EV.askName!==false) keep.push("이름(별명도 괜찮아요)"); if(EV.extraLabel) keep.push(EV.extraLabel); keep.push("쓴 글","고른 색"); if(EV.photos!==false) keep.push("붙인 사진");
   $("#keepTxt").textContent=keep.join(", ");
-  const d=EVT.deco[EV.theme]||EVT.deco.chalk; $("#wd1").textContent=d[0]; $("#wd2").textContent=d[1];
+  $("#wd1").innerHTML=EVT.svg(0,EV.theme,"width:30px;height:30px"); $("#wd2").innerHTML=EVT.svg(1,EV.theme,"width:30px;height:30px");
 }
 applyEvent(null);
 /* 행사 코드: QR 주소의 ?c= 를 기억해 두고, 주소창에서는 지워요 (주소만 퍼져도 남이 못 들어오게) */

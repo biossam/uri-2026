@@ -31,8 +31,7 @@ function applyEvent(ev,relayout){
   EV=Object.assign(EVT.fallback(),ev||{}); EVT.theme(EV);
   document.title=EV.title; $("#title").textContent=EV.title; $("#subtitle").textContent=EV.subtitle||"";
   $("#emptySub").textContent=EV.prompt?`QR을 찍고 남겨 주세요 · ${EV.prompt}`:"QR을 찍고 한 마디 남겨 주세요";
-  const d=EVT.deco[EV.theme]||EVT.deco.chalk;
-  $("#deco").innerHTML=d.map((e,i)=>{ const p=DECO_POS[i]; return `<span style="left:${p[0]};top:${p[1]};${p[2]?`bottom:${p[2]}`:""}">${e}</span>`; }).join("");
+  $("#deco").innerHTML=DECO_POS.map((p,i)=>EVT.svg(i,EV.theme,`left:${p[0]};top:${p[1]};${p[2]?`bottom:${p[2]};`:""}`)).join("");
   if(relayout) showPage(cur,{instant:true});
 }
 applyEvent(null,false);

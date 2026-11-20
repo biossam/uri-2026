@@ -1,58 +1,52 @@
-/* 행사 테마 — 관리자 화면 '행사 설정'에서 고른 테마가 <html data-theme="…"> 로 들어와요 */
+/* 행사 테마 — 관리자 화면 '행사 설정'에서 고른 테마가 <html data-theme="…"> 로 들어와요
+   글씨가 손글씨 분필이라, 테두리는 모두 나뭇결 칠판 틀로 맞추고 나무 색과 칠판 색만 바꿔요.
+   🎓 초록 칠판(졸업식)은 index.html·letter.html 기본값 그대로예요. */
 
-/* 🎓 칠판 (졸업식) — 기본값은 index.html·letter.html 에 그대로 있어요 */
-
-/* 🌸 벚꽃 (입학식) */
+/* 🌸 벚꽃 칠판 (입학식·스승의 날) — 자작나무 틀 */
 html[data-theme="sakura"]{--board:#5b3f57;--c1:#ffd6e4;--c3:#ffe6a8}
-html[data-theme="sakura"] #stage,html[data-theme="sakura"] body.write{background:linear-gradient(180deg,#f4d3d8,#e3aab6 60%,#c98597)}
-html[data-theme="sakura"] #tray{background:linear-gradient(#e6b3bf,#c98597)}
-html[data-theme="sakura"] #pager{color:#5b3f57}
+html[data-theme="sakura"] #stage,html[data-theme="sakura"] body.write{background:linear-gradient(180deg,#e4c9a6,#cfa77c 60%,#b48a5f)}
+html[data-theme="sakura"] #tray{background:linear-gradient(#c69d70,#a07a50)}
+html[data-theme="sakura"] #pager{color:#4a3524}
 html[data-theme="sakura"] #qrCard h3{color:#5b3f57}
 
-/* 📖 차분한 파랑 (수업 공개) */
+/* 📖 파란 칠판 (수업 공개) — 참나무 틀 */
 html[data-theme="calm"]{--board:#2c4060;--c1:#ffe6a0;--c3:#bfe3ff}
-html[data-theme="calm"] #stage,html[data-theme="calm"] body.write{background:linear-gradient(180deg,#d9cbb0,#bfa983 60%,#9d875f)}
-html[data-theme="calm"] #tray{background:linear-gradient(#c2ab84,#9d875f)}
-html[data-theme="calm"] #pager{color:#3a3020}
+html[data-theme="calm"] #stage,html[data-theme="calm"] body.write{background:linear-gradient(180deg,#d6bf98,#b99d72 60%,#987c52)}
+html[data-theme="calm"] #tray{background:linear-gradient(#b0946a,#8c7048)}
+html[data-theme="calm"] #pager{color:#3a2c1c}
 html[data-theme="calm"] #qrCard h3{color:#2c4060}
 
-/* 🎉 축제 (연구회 페스타) */
-html[data-theme="festa"]{--board:#34305f;--c1:#ffd95e;--c3:#9fe7ff}
-html[data-theme="festa"] #stage,html[data-theme="festa"] body.write{background:
-  repeating-linear-gradient(45deg,#ffd166 0 3%,#ff9fb2 3% 6%,#8fd3ff 6% 9%,#b8f2a6 9% 12%)}
-html[data-theme="festa"] #stage::before{display:none}
-html[data-theme="festa"] #tray{background:linear-gradient(#f7b267,#e07a3f)}
-html[data-theme="festa"] #pager{color:#34305f;text-shadow:0 0 .4cqh #fff}
-html[data-theme="festa"] #qrCard h3{color:#34305f}
+/* 🎉 남색 칠판 (연구회 페스타·학예회) — 꿀색 나무 틀 */
+html[data-theme="festa"]{--board:#2f3a5c;--c1:#ffe08a;--c3:#bfe6ff}
+html[data-theme="festa"] #stage,html[data-theme="festa"] body.write{background:linear-gradient(180deg,#dcab68,#c28a45 60%,#a26d30)}
+html[data-theme="festa"] #tray{background:linear-gradient(#b98142,#94642c)}
+html[data-theme="festa"] #pager{color:#3a2510}
+html[data-theme="festa"] #qrCard h3{color:#2f3a5c}
 
-/* 🌇 노을 (송별회) */
+/* 🌇 노을 칠판 (송별회) — 체리나무 틀 */
 html[data-theme="sunset"]{--board:#553a46;--c1:#ffd59e;--c3:#ffc2b3}
-html[data-theme="sunset"] #stage,html[data-theme="sunset"] body.write{background:linear-gradient(180deg,#ffd29e,#f4a27f 55%,#d97a6c)}
-html[data-theme="sunset"] #stage::before{display:none}
-html[data-theme="sunset"] #tray{background:linear-gradient(#f0a07c,#c96c5f)}
-html[data-theme="sunset"] #pager{color:#553a46}
+html[data-theme="sunset"] #stage,html[data-theme="sunset"] body.write{background:linear-gradient(180deg,#b8714f,#9a573a 60%,#7c4128)}
+html[data-theme="sunset"] #tray{background:linear-gradient(#94553a,#713c24)}
+html[data-theme="sunset"] #pager{color:#fbe7c8}
 html[data-theme="sunset"] #qrCard h3{color:#553a46}
 
-/* ☁️ 하늘 (환영회) */
+/* ☁️ 하늘 칠판 (환영회) — 흰 칠 나무 틀 */
 html[data-theme="sky"]{--board:#2d5870;--c1:#fff1a8;--c3:#c9f0ff}
-html[data-theme="sky"] #stage,html[data-theme="sky"] body.write{background:
-  radial-gradient(18% 9% at 14% 22%,#fff 60%,#fff0 62%),radial-gradient(14% 7% at 84% 78%,#fff 60%,#fff0 62%),
-  linear-gradient(180deg,#d3eefc,#a6d6f0 60%,#82bfe0)}
-html[data-theme="sky"] #stage::before{display:none}
-html[data-theme="sky"] #tray{background:linear-gradient(#9ccbe6,#6fa9cc)}
-html[data-theme="sky"] #pager{color:#2d5870}
+html[data-theme="sky"] #stage,html[data-theme="sky"] body.write{background:linear-gradient(180deg,#e7dcc8,#cdbd9f 60%,#ae9d7d)}
+html[data-theme="sky"] #tray{background:linear-gradient(#c4b392,#a39274)}
+html[data-theme="sky"] #pager{color:#3a3020}
 html[data-theme="sky"] #qrCard h3{color:#2d5870}
 
-/* 🎂 생일 파티 */
+/* 🎂 보라 칠판 (생일) — 단풍나무 틀 */
 html[data-theme="birthday"]{--board:#4a3a6c;--c1:#ffe17a;--c3:#ffc6e0}
-html[data-theme="birthday"] #stage,html[data-theme="birthday"] body.write{background:
-  radial-gradient(circle,#ffffffaa 18%,#fff0 20%) 0 0/26px 26px,linear-gradient(180deg,#ffd6e6,#ffb6cf 60%,#f59bbc)}
-html[data-theme="birthday"] #stage::before{display:none}
-html[data-theme="birthday"] #tray{background:linear-gradient(#f9a8c6,#e07aa3)}
-html[data-theme="birthday"] #pager{color:#4a3a6c}
+html[data-theme="birthday"] #stage,html[data-theme="birthday"] body.write{background:linear-gradient(180deg,#e9c99c,#d2a970 60%,#b48a52)}
+html[data-theme="birthday"] #tray{background:linear-gradient(#c99f68,#a37e48)}
+html[data-theme="birthday"] #pager{color:#3a2a14}
 html[data-theme="birthday"] #qrCard h3{color:#4a3a6c}
 
-/* 테마 꾸밈 (이모지) */
+/* 분필 낙서 꾸밈 */
 #deco{position:absolute;inset:0;pointer-events:none;z-index:1}
-#deco span{position:absolute;font-size:4cqh;opacity:.85;filter:drop-shadow(0 .3cqh .4cqh #0005)}
-.wdeco{position:absolute;font-size:22px;opacity:.85;pointer-events:none}
+#deco svg{position:absolute;width:7cqh;height:7cqh;opacity:.85;overflow:visible}
+#deco svg.wide{width:18cqh}
+#deco svg *,.wdeco *{fill:none;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+.wdeco{position:absolute;width:30px;height:30px;opacity:.85;pointer-events:none;overflow:visible}

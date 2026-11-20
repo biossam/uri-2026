@@ -117,7 +117,7 @@ $("#csv").onclick=()=>{
 $("#keep").onclick=()=>{
   const list=all.filter(l=>!l.hidden).slice().sort((a,b)=>(a.timestamp||0)-(b.timestamp||0));
   if(!list.length) return alert("남길 글이 아직 없어요");
-  const E=(EV&&EV.event)||{}, T=E.title||"방명록", BG={chalk:"#2f4b3c",sakura:"#5b3f57",calm:"#2c4060",festa:"#34305f",sunset:"#553a46",sky:"#2d5870",birthday:"#4a3a6c"}[E.theme]||"#2f4b3c";
+  const E=(EV&&EV.event)||{}, T=E.title||"방명록", BG={chalk:"#2f4b3c",sakura:"#5b3f57",calm:"#2c4060",festa:"#2f3a5c",sunset:"#553a46",sky:"#2d5870",birthday:"#4a3a6c"}[E.theme]||"#2f4b3c";
   const img=p=>typeof p==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(p)?`<img src="${p}" alt="">`:"";
   const cards=list.map(l=>`<div class="c" style="background:${COLORS[l.color]??"#fffdf6"}">${img(l.photo)}<p>${esc(l.text).replace(/\n/g,"<br>")}</p><b>${esc(EVT.sign(l,EV&&EV.event))}</b><i>${new Date(l.timestamp||0).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}</i></div>`).join("");
   const html=`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(T)} · 방명록</title><style>
